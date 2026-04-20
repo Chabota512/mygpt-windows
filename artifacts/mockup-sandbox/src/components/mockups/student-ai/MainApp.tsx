@@ -67,6 +67,12 @@ export function MainApp() {
   const [activeTool, setActiveTool] = useState<string | null>(null);
   const [rightOpen, setRightOpen] = useState(true);
 
+  type Attachment = { name: string; kind: "image" | "pdf" | "doc" };
+  const [attachments, setAttachments] = useState<Attachment[]>([
+    { name: "servo_diagram.jpg", kind: "image" },
+    { name: "Thermodynamics_Ch5.pdf", kind: "pdf" },
+  ]);
+
   function selectChat(label: string) {
     setActiveChat(label);
     // auto-close sidebar after picking a chat
@@ -367,19 +373,34 @@ export function MainApp() {
             </div>
           )}
 
-          {/* Uploaded image preview */}
-          <div className="mb-3 flex items-center gap-2 px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.06] w-fit">
-            <div className="w-8 h-8 rounded bg-violet-500/20 flex items-center justify-center">
-              <Image className="w-4 h-4 text-violet-400" />
+          {/* Attachment staging area — only visible when files are queued */}
+          {attachments.length > 0 && (
+            <div className="mb-3 flex items-center gap-2 flex-wrap">
+              {attachments.map((att) => (
+                <div key={att.name} className="flex items-center gap-2 pl-2 pr-1.5 py-1.5 rounded-xl bg-white/[0.04] border border-white/[0.06]">
+                  <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                    att.kind === "image" ? "bg-violet-500/15" : att.kind === "pdf" ? "bg-rose-500/15" : "bg-blue-500/15"
+                  }`}>
+                    {att.kind === "image" && <Image className="w-3.5 h-3.5 text-violet-400" />}
+                    {att.kind === "pdf"   && <FileText className="w-3.5 h-3.5 text-rose-400" />}
+                    {att.kind === "doc"   && <FileText className="w-3.5 h-3.5 text-blue-400" />}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs font-medium text-white/70 max-w-[140px] truncate">{att.name}</p>
+                    <p className="text-[10px] text-white/30">
+                      {att.kind === "image" ? "Image · will be analysed" : att.kind === "pdf" ? "PDF · context for this message" : "Document"}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setAttachments((a) => a.filter((x) => x.name !== att.name))}
+                    className="ml-0.5 w-5 h-5 flex items-center justify-center rounded-md text-white/25 hover:text-white/60 hover:bg-white/[0.08] transition-colors"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              ))}
             </div>
-            <div>
-              <p className="text-xs font-medium text-white/70">servo_diagram.jpg</p>
-              <p className="text-[10px] text-white/30">Image ready for analysis</p>
-            </div>
-            <button className="ml-2 text-white/30 hover:text-white/60">
-              <X className="w-3.5 h-3.5" />
-            </button>
-          </div>
+          )}
 
           {/* Tools popover */}
           {toolsOpen && (
