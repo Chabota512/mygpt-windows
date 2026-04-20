@@ -5,7 +5,7 @@ import {
   WifiOff, Download, Clock, MessageSquare,
   X, Plus, Mic, Layers,
   PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen,
-  PenLine, Calculator, Globe, ChevronUp, Search, ScanText
+  PenLine, Calculator, ChevronUp, Search
 } from "lucide-react";
 
 type Message = {
@@ -345,14 +345,13 @@ export function MainApp() {
           {activeTool && (
             <div className="mb-3 flex items-center gap-2">
               <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium border ${
-                activeTool === "Canvas"
+                activeTool === "Write Doc"
                   ? "bg-indigo-500/10 border-indigo-500/25 text-indigo-300"
-                  : activeTool === "Document Scan"
-                  ? "bg-violet-500/10 border-violet-500/25 text-violet-300"
-                  : "bg-white/[0.06] border-white/10 text-white/50"
+                  : activeTool === "Calculator"
+                  ? "bg-emerald-500/10 border-emerald-500/25 text-emerald-300"
+                  : "bg-amber-500/10 border-amber-500/25 text-amber-300"
               }`}>
-                {activeTool === "Canvas" && <PenLine className="w-3 h-3" />}
-                {activeTool === "Document Scan" && <ScanText className="w-3 h-3" />}
+                {activeTool === "Write Doc" && <PenLine className="w-3 h-3" />}
                 {activeTool === "Calculator" && <Calculator className="w-3 h-3" />}
                 {activeTool === "Search Notes" && <Search className="w-3 h-3" />}
                 {activeTool}
@@ -361,8 +360,7 @@ export function MainApp() {
                 </button>
               </div>
               <span className="text-[10px] text-white/25">
-                {activeTool === "Canvas" && "Responses will open in a document editor"}
-                {activeTool === "Document Scan" && "Attach an image or PDF to extract text"}
+                {activeTool === "Write Doc" && "Responses will open in a document editor"}
                 {activeTool === "Calculator" && "Step-by-step maths mode active"}
                 {activeTool === "Search Notes" && "Searching across your saved memory"}
               </span>
@@ -385,10 +383,9 @@ export function MainApp() {
 
           {/* Tools popover */}
           {toolsOpen && (
-            <div className="mb-3 p-2 rounded-2xl bg-[#1a1d2e] border border-white/[0.08] grid grid-cols-4 gap-1">
+            <div className="mb-3 p-2 rounded-2xl bg-[#1a1d2e] border border-white/[0.08] grid grid-cols-3 gap-1">
               {[
-                { id: "Canvas", icon: PenLine, label: "Canvas", desc: "Write & edit docs", color: "text-indigo-400", bg: "bg-indigo-500/10 border-indigo-500/15" },
-                { id: "Document Scan", icon: ScanText, label: "Scan Doc", desc: "Extract from image", color: "text-violet-400", bg: "bg-violet-500/10 border-violet-500/15" },
+                { id: "Write Doc", icon: PenLine, label: "Write Doc", desc: "Write & edit docs", color: "text-indigo-400", bg: "bg-indigo-500/10 border-indigo-500/15" },
                 { id: "Calculator", icon: Calculator, label: "Calculator", desc: "Step-by-step maths", color: "text-emerald-400", bg: "bg-emerald-500/10 border-emerald-500/15" },
                 { id: "Search Notes", icon: Search, label: "Search Notes", desc: "Search your memory", color: "text-amber-400", bg: "bg-amber-500/10 border-amber-500/15" },
               ].map((tool) => (
@@ -429,8 +426,7 @@ export function MainApp() {
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 placeholder={
-                  activeTool === "Canvas" ? "Describe what you'd like to write or edit..."
-                  : activeTool === "Document Scan" ? "Attach a file and I'll extract the content..."
+                  activeTool === "Write Doc" ? "Describe what you'd like to write or edit..."
                   : activeTool === "Calculator" ? "Enter an equation or problem..."
                   : activeTool === "Search Notes" ? "Search your saved notes and files..."
                   : "Ask anything, attach images or PDFs..."
