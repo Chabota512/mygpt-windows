@@ -81,13 +81,13 @@ export function MainApp() {
         <div className="px-4 py-3">
           <button className="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 transition-colors text-sm font-medium shadow-md shadow-indigo-500/20">
             <Plus className="w-4 h-4" />
-            New Session
+            New Chat
           </button>
         </div>
 
         {/* Sessions */}
         <div className="flex-1 overflow-y-auto px-3 pb-4">
-          <p className="text-[10px] uppercase tracking-widest text-white/30 font-semibold px-2 mb-2">Sessions</p>
+          <p className="text-[10px] uppercase tracking-widest text-white/30 font-semibold px-2 mb-2">Chats</p>
           <div className="space-y-0.5">
             {SESSIONS.map((s) => (
               <button
