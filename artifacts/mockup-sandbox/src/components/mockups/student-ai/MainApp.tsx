@@ -71,7 +71,7 @@ export function MainApp() {
               <Brain className="w-4 h-4 text-white" />
             </div>
             <div>
-              <p className="text-sm font-semibold tracking-tight">StudyMind AI</p>
+              <p className="text-sm font-semibold tracking-tight">My_GPT 4 Students</p>
               <p className="text-[10px] text-white/40 font-medium">Offline · Local Model</p>
             </div>
           </div>
