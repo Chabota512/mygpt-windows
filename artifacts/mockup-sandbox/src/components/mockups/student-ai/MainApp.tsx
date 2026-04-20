@@ -4,7 +4,7 @@ import {
   Settings, ChevronRight, Paperclip, MoreHorizontal,
   WifiOff, Download, Clock, MessageSquare,
   X, Plus, Mic, Layers,
-  PanelLeftClose, PanelLeftOpen,
+  PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen,
   PenLine, Calculator, Globe, ChevronUp, Search, ScanText
 } from "lucide-react";
 
@@ -65,6 +65,7 @@ export function MainApp() {
   const [activeChat, setActiveChat] = useState("PID Control Study");
   const [toolsOpen, setToolsOpen] = useState(false);
   const [activeTool, setActiveTool] = useState<string | null>(null);
+  const [rightOpen, setRightOpen] = useState(true);
 
   function selectChat(label: string) {
     setActiveChat(label);
@@ -239,6 +240,15 @@ export function MainApp() {
             <button className="w-8 h-8 flex items-center justify-center rounded-lg bg-white/[0.04] hover:bg-white/[0.08] text-white/40 transition-colors">
               <MoreHorizontal className="w-4 h-4" />
             </button>
+            {!rightOpen && (
+              <button
+                onClick={() => setRightOpen(true)}
+                className="w-8 h-8 flex items-center justify-center rounded-lg text-white/30 hover:text-white/70 hover:bg-white/[0.06] transition-colors"
+                title="Open context panel"
+              >
+                <PanelRightOpen className="w-4 h-4" />
+              </button>
+            )}
           </div>
         </header>
 
@@ -448,92 +458,140 @@ export function MainApp() {
       </main>
 
       {/* Right Panel — Context / Memory */}
-      <aside className="w-72 flex-shrink-0 bg-[#13151f] border-l border-white/[0.06] flex flex-col">
-        <div className="px-5 py-4 border-b border-white/[0.06]">
-          <h2 className="text-xs font-semibold text-white/70 uppercase tracking-wider">Context</h2>
-          <p className="text-[11px] text-white/30 mt-0.5">Memory items feeding this chat</p>
-        </div>
+      <aside
+        className={`flex-shrink-0 bg-[#13151f] border-l border-white/[0.06] flex flex-col transition-all duration-300 ease-in-out overflow-hidden ${
+          rightOpen ? "w-72" : "w-12"
+        }`}
+      >
+        {rightOpen ? (
+          /* ── EXPANDED STATE ── */
+          <>
+            <div className="px-4 py-4 border-b border-white/[0.06] flex items-center justify-between">
+              <div>
+                <h2 className="text-xs font-semibold text-white/70 uppercase tracking-wider">Context</h2>
+                <p className="text-[11px] text-white/30 mt-0.5">Memory items feeding this chat</p>
+              </div>
+              <button
+                onClick={() => setRightOpen(false)}
+                className="w-7 h-7 flex items-center justify-center rounded-lg text-white/30 hover:text-white/70 hover:bg-white/[0.06] transition-colors flex-shrink-0"
+                title="Close context panel"
+              >
+                <PanelRightClose className="w-4 h-4" />
+              </button>
+            </div>
 
-        <div className="flex-1 overflow-y-auto p-4 space-y-3">
-          {/* Active memory items */}
-          {[
-            {
-              icon: FileText, label: "PID Control Notes", date: "Nov 12", color: "text-blue-400", bg: "bg-blue-500/10",
-              desc: "12 pages · Lecture notes from ME301"
-            },
-            {
-              icon: Image, label: "Lab Diagram — Servo", date: "Nov 10", color: "text-violet-400", bg: "bg-violet-500/10",
-              desc: "Whiteboard photo · Feedback loop diagram"
-            },
-          ].map((item) => (
-            <div key={item.label} className="rounded-xl bg-white/[0.03] border border-white/[0.06] p-3">
-              <div className="flex items-start gap-2.5">
-                <div className={`w-7 h-7 rounded-lg ${item.bg} flex items-center justify-center flex-shrink-0`}>
-                  <item.icon className={`w-3.5 h-3.5 ${item.color}`} />
+            <div className="flex-1 overflow-y-auto p-4 space-y-3">
+              {[
+                { icon: FileText, label: "PID Control Notes", date: "Nov 12", color: "text-blue-400", bg: "bg-blue-500/10", desc: "12 pages · Lecture notes from ME301" },
+                { icon: Image, label: "Lab Diagram — Servo", date: "Nov 10", color: "text-violet-400", bg: "bg-violet-500/10", desc: "Whiteboard photo · Feedback loop diagram" },
+              ].map((item) => (
+                <div key={item.label} className="rounded-xl bg-white/[0.03] border border-white/[0.06] p-3">
+                  <div className="flex items-start gap-2.5">
+                    <div className={`w-7 h-7 rounded-lg ${item.bg} flex items-center justify-center flex-shrink-0`}>
+                      <item.icon className={`w-3.5 h-3.5 ${item.color}`} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-medium text-white/80 truncate">{item.label}</p>
+                      <p className="text-[10px] text-white/35 mt-0.5">{item.desc}</p>
+                      <p className="text-[10px] text-white/25 mt-1">{item.date}</p>
+                    </div>
+                    <button className="text-white/20 hover:text-white/50 transition-colors">
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-medium text-white/80 truncate">{item.label}</p>
-                  <p className="text-[10px] text-white/35 mt-0.5">{item.desc}</p>
-                  <p className="text-[10px] text-white/25 mt-1">{item.date}</p>
+              ))}
+
+              <div className="mt-2">
+                <p className="text-[10px] uppercase tracking-widest text-white/30 font-semibold mb-2">Generated Documents</p>
+                {[
+                  { label: "Lab Report — PID Control", format: "DOCX", date: "Now" },
+                  { label: "Summary — Thermodynamics", format: "PDF", date: "Yesterday" },
+                ].map((doc) => (
+                  <div key={doc.label} className="flex items-center gap-2.5 py-2.5 border-b border-white/[0.04]">
+                    <div className="w-7 h-7 rounded-lg bg-emerald-500/10 flex items-center justify-center">
+                      <FileText className="w-3.5 h-3.5 text-emerald-400" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs text-white/70 truncate">{doc.label}</p>
+                      <p className="text-[10px] text-white/30">{doc.format} · {doc.date}</p>
+                    </div>
+                    <button className="text-white/25 hover:text-white/60 transition-colors">
+                      <Download className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              <button className="w-full mt-2 flex items-center justify-center gap-2 py-2.5 rounded-xl border border-dashed border-white/[0.1] text-xs text-white/30 hover:text-white/60 hover:border-white/20 transition-colors">
+                <Plus className="w-3.5 h-3.5" />
+                Add files to memory
+              </button>
+            </div>
+
+            <div className="px-4 py-4 border-t border-white/[0.06] space-y-2.5">
+              {[
+                { label: "Model", value: "Llama 3.1 8B", color: "text-indigo-400" },
+                { label: "Vision", value: "Moondream2", color: "text-violet-400" },
+                { label: "Memory", value: "ChromaDB · Local", color: "text-emerald-400" },
+              ].map((row) => (
+                <div key={row.label} className="flex items-center justify-between">
+                  <span className="text-[10px] text-white/30 font-medium">{row.label}</span>
+                  <span className={`text-[10px] font-semibold ${row.color}`}>{row.value}</span>
                 </div>
-                <button className="text-white/20 hover:text-white/50 transition-colors">
-                  <X className="w-3.5 h-3.5" />
-                </button>
+              ))}
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] text-white/30 font-medium">Status</span>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                  <span className="text-[10px] text-emerald-400 font-semibold">Fully Offline</span>
+                </div>
               </div>
             </div>
-          ))}
+          </>
+        ) : (
+          /* ── COLLAPSED STATE — thin icon rail, click anywhere to open ── */
+          <div
+            className="flex flex-col items-center py-3 gap-3 h-full cursor-pointer group"
+            onClick={() => setRightOpen(true)}
+            title="Open context panel"
+          >
+            {/* Open trigger icon */}
+            <button
+              className="w-8 h-8 flex items-center justify-center rounded-lg text-white/30 group-hover:text-white/70 group-hover:bg-white/[0.06] transition-colors"
+              onClick={(e) => { e.stopPropagation(); setRightOpen(true); }}
+            >
+              <PanelRightOpen className="w-4 h-4" />
+            </button>
 
-          {/* Document Output */}
-          <div className="mt-2">
-            <p className="text-[10px] uppercase tracking-widest text-white/30 font-semibold mb-2">Generated Documents</p>
-            {[
-              { label: "Lab Report — PID Control", format: "DOCX", date: "Now" },
-              { label: "Summary — Thermodynamics", format: "PDF", date: "Yesterday" },
-            ].map((doc) => (
-              <div key={doc.label} className="flex items-center gap-2.5 py-2.5 border-b border-white/[0.04]">
-                <div className="w-7 h-7 rounded-lg bg-emerald-500/10 flex items-center justify-center">
-                  <FileText className="w-3.5 h-3.5 text-emerald-400" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs text-white/70 truncate">{doc.label}</p>
-                  <p className="text-[10px] text-white/30">{doc.format} · {doc.date}</p>
-                </div>
-                <button className="text-white/25 hover:text-white/60 transition-colors">
-                  <Download className="w-3.5 h-3.5" />
-                </button>
+            <div className="w-6 h-px bg-white/[0.08] rounded" />
+
+            {/* Context icon */}
+            <div className="w-8 h-8 rounded-lg bg-white/[0.04] flex items-center justify-center">
+              <Layers className="w-3.5 h-3.5 text-white/25 group-hover:text-white/50 transition-colors" />
+            </div>
+
+            <div className="w-6 h-px bg-white/[0.08] rounded" />
+
+            {/* File hint icons */}
+            <div className="flex flex-col items-center gap-2">
+              <div className="w-7 h-7 flex items-center justify-center rounded-lg text-white/20 group-hover:text-white/40 transition-colors" title="PID Control Notes">
+                <FileText className="w-3.5 h-3.5" />
               </div>
-            ))}
-          </div>
+              <div className="w-7 h-7 flex items-center justify-center rounded-lg text-white/20 group-hover:text-white/40 transition-colors" title="Lab Diagram — Servo">
+                <Image className="w-3.5 h-3.5" />
+              </div>
+              <div className="w-7 h-7 flex items-center justify-center rounded-lg text-white/20 group-hover:text-white/40 transition-colors" title="Generated Documents">
+                <BookOpen className="w-3.5 h-3.5" />
+              </div>
+            </div>
 
-          {/* Add memory */}
-          <button className="w-full mt-2 flex items-center justify-center gap-2 py-2.5 rounded-xl border border-dashed border-white/[0.1] text-xs text-white/30 hover:text-white/60 hover:border-white/20 transition-colors">
-            <Plus className="w-3.5 h-3.5" />
-            Add files to memory
-          </button>
-        </div>
-
-        {/* Model Info */}
-        <div className="px-4 py-4 border-t border-white/[0.06] space-y-2.5">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] text-white/30 font-medium">Model</span>
-            <span className="text-[10px] text-indigo-400 font-semibold">Llama 3.1 8B</span>
-          </div>
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] text-white/30 font-medium">Vision</span>
-            <span className="text-[10px] text-violet-400 font-semibold">Moondream2</span>
-          </div>
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] text-white/30 font-medium">Memory</span>
-            <span className="text-[10px] text-emerald-400 font-semibold">ChromaDB · Local</span>
-          </div>
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] text-white/30 font-medium">Status</span>
-            <div className="flex items-center gap-1.5">
-              <div className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-              <span className="text-[10px] text-emerald-400 font-semibold">Fully Offline</span>
+            {/* Offline dot at bottom */}
+            <div className="mt-auto mb-2 flex flex-col items-center gap-1.5">
+              <div className="w-1.5 h-1.5 rounded-full bg-emerald-400" title="Fully Offline" />
             </div>
           </div>
-        </div>
+        )}
       </aside>
     </div>
   );
