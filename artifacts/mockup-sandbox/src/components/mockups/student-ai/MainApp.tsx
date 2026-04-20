@@ -3,7 +3,8 @@ import {
   Sparkles, Send, Upload, FileText, Image, BookOpen, History,
   Settings, ChevronRight, Paperclip, MoreHorizontal, Search,
   Cpu, Wifi, WifiOff, Download, Star, Clock, MessageSquare,
-  FolderOpen, Zap, ChevronDown, X, Plus, Mic, File, Layers
+  FolderOpen, Zap, ChevronDown, X, Plus, Mic, File, Layers,
+  PanelLeftClose, PanelLeftOpen
 } from "lucide-react";
 
 type Message = {
@@ -59,96 +60,175 @@ const SESSIONS = [
 export function MainApp() {
   const [input, setInput] = useState("");
   const [activeTab, setActiveTab] = useState<"chat" | "memory" | "docs">("chat");
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [activeChat, setActiveChat] = useState("PID Control Study");
+
+  function selectChat(label: string) {
+    setActiveChat(label);
+    // auto-close sidebar after picking a chat
+    setSidebarOpen(false);
+  }
 
   return (
     <div className="flex h-screen bg-[#0f1117] text-white font-sans overflow-hidden">
       {/* Sidebar */}
-      <aside className="w-64 flex-shrink-0 bg-[#13151f] border-r border-white/[0.06] flex flex-col">
-        {/* Logo */}
-        <div className="px-5 py-5 border-b border-white/[0.06]">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center shadow-lg shadow-indigo-500/20">
-              <Sparkles className="w-4 h-4 text-white" />
-            </div>
-            <div>
-              <p className="text-sm font-semibold tracking-tight">My_GPT 4 Students</p>
-              <p className="text-[10px] text-white/40 font-medium">Offline · Local Model</p>
-            </div>
-          </div>
-        </div>
-
-        {/* New Chat Button */}
-        <div className="px-4 py-3">
-          <button className="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 transition-colors text-sm font-medium shadow-md shadow-indigo-500/20">
-            <Plus className="w-4 h-4" />
-            New Chat
-          </button>
-        </div>
-
-        {/* Sessions */}
-        <div className="flex-1 overflow-y-auto px-3 pb-4">
-          <p className="text-[10px] uppercase tracking-widest text-white/30 font-semibold px-2 mb-2">Chats</p>
-          <div className="space-y-0.5">
-            {SESSIONS.map((s) => (
+      <aside
+        className={`flex-shrink-0 bg-[#13151f] border-r border-white/[0.06] flex flex-col transition-all duration-300 ease-in-out overflow-hidden ${
+          sidebarOpen ? "w-64" : "w-12"
+        }`}
+      >
+        {sidebarOpen ? (
+          /* ── EXPANDED STATE ── */
+          <>
+            {/* Logo + close button */}
+            <div className="px-4 py-4 border-b border-white/[0.06] flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center shadow-lg shadow-indigo-500/20 flex-shrink-0">
+                  <Sparkles className="w-4 h-4 text-white" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold tracking-tight whitespace-nowrap">My_GPT 4 Students</p>
+                  <p className="text-[10px] text-white/40 font-medium">Offline · Local Model</p>
+                </div>
+              </div>
               <button
-                key={s.label}
-                className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left transition-all ${
-                  s.active
-                    ? "bg-indigo-600/20 text-white border border-indigo-500/20"
-                    : "text-white/50 hover:text-white/80 hover:bg-white/[0.04]"
-                }`}
+                onClick={() => setSidebarOpen(false)}
+                className="w-7 h-7 flex items-center justify-center rounded-lg text-white/30 hover:text-white/70 hover:bg-white/[0.06] transition-colors flex-shrink-0"
+                title="Close sidebar"
               >
-                <MessageSquare className={`w-3.5 h-3.5 flex-shrink-0 ${s.active ? "text-indigo-400" : ""}`} />
-                <span className="text-xs flex-1 truncate font-medium">{s.label}</span>
-                <span className="text-[10px] text-white/30">{s.time}</span>
+                <PanelLeftClose className="w-4 h-4" />
               </button>
-            ))}
-          </div>
-
-          <p className="text-[10px] uppercase tracking-widest text-white/30 font-semibold px-2 mt-5 mb-2">Memory</p>
-          <div className="space-y-0.5">
-            {MEMORY_ITEMS.map((m) => (
-              <button
-                key={m.label}
-                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left text-white/50 hover:text-white/80 hover:bg-white/[0.04] transition-all"
-              >
-                <m.icon className="w-3.5 h-3.5 flex-shrink-0 text-violet-400" />
-                <span className="text-xs flex-1 truncate">{m.label}</span>
-                <span className="text-[10px] text-white/30">{m.date}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Status Bar */}
-        <div className="px-4 py-3 border-t border-white/[0.06]">
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-1.5">
-              <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              <span className="text-[10px] text-white/40 font-medium">Llama 3.1 · 8B Q4</span>
             </div>
-            <WifiOff className="w-3 h-3 text-white/25" />
-          </div>
-          <div className="w-full bg-white/[0.06] rounded-full h-1">
-            <div className="bg-indigo-500/70 h-1 rounded-full" style={{ width: "62%" }} />
-          </div>
-          <p className="text-[10px] text-white/30 mt-1">3.2 GB / 5.1 GB VRAM</p>
-        </div>
 
-        {/* Settings */}
-        <button className="flex items-center gap-2.5 px-5 py-3 border-t border-white/[0.06] text-white/40 hover:text-white/70 transition-colors text-xs">
-          <Settings className="w-3.5 h-3.5" />
-          Settings
-        </button>
+            {/* New Chat Button */}
+            <div className="px-4 py-3">
+              <button className="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 transition-colors text-sm font-medium shadow-md shadow-indigo-500/20">
+                <Plus className="w-4 h-4" />
+                New Chat
+              </button>
+            </div>
+
+            {/* Chats + Memory list */}
+            <div className="flex-1 overflow-y-auto px-3 pb-4">
+              <p className="text-[10px] uppercase tracking-widest text-white/30 font-semibold px-2 mb-2">Chats</p>
+              <div className="space-y-0.5">
+                {SESSIONS.map((s) => (
+                  <button
+                    key={s.label}
+                    onClick={() => selectChat(s.label)}
+                    className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left transition-all ${
+                      activeChat === s.label
+                        ? "bg-indigo-600/20 text-white border border-indigo-500/20"
+                        : "text-white/50 hover:text-white/80 hover:bg-white/[0.04]"
+                    }`}
+                  >
+                    <MessageSquare className={`w-3.5 h-3.5 flex-shrink-0 ${activeChat === s.label ? "text-indigo-400" : ""}`} />
+                    <span className="text-xs flex-1 truncate font-medium">{s.label}</span>
+                    <span className="text-[10px] text-white/30">{s.time}</span>
+                  </button>
+                ))}
+              </div>
+
+              <p className="text-[10px] uppercase tracking-widest text-white/30 font-semibold px-2 mt-5 mb-2">Memory</p>
+              <div className="space-y-0.5">
+                {MEMORY_ITEMS.map((m) => (
+                  <button
+                    key={m.label}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left text-white/50 hover:text-white/80 hover:bg-white/[0.04] transition-all"
+                  >
+                    <m.icon className="w-3.5 h-3.5 flex-shrink-0 text-violet-400" />
+                    <span className="text-xs flex-1 truncate">{m.label}</span>
+                    <span className="text-[10px] text-white/30">{m.date}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Status Bar */}
+            <div className="px-4 py-3 border-t border-white/[0.06]">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-1.5">
+                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  <span className="text-[10px] text-white/40 font-medium">Llama 3.1 · 8B Q4</span>
+                </div>
+                <WifiOff className="w-3 h-3 text-white/25" />
+              </div>
+              <div className="w-full bg-white/[0.06] rounded-full h-1">
+                <div className="bg-indigo-500/70 h-1 rounded-full" style={{ width: "62%" }} />
+              </div>
+              <p className="text-[10px] text-white/30 mt-1">3.2 GB / 5.1 GB VRAM</p>
+            </div>
+
+            {/* Settings */}
+            <button className="flex items-center gap-2.5 px-5 py-3 border-t border-white/[0.06] text-white/40 hover:text-white/70 transition-colors text-xs">
+              <Settings className="w-3.5 h-3.5" />
+              Settings
+            </button>
+          </>
+        ) : (
+          /* ── COLLAPSED STATE — thin icon rail, click anywhere to open ── */
+          <div
+            className="flex flex-col items-center py-3 gap-3 h-full cursor-pointer group"
+            onClick={() => setSidebarOpen(true)}
+            title="Open sidebar"
+          >
+            {/* Open trigger icon */}
+            <button
+              className="w-8 h-8 flex items-center justify-center rounded-lg text-white/30 group-hover:text-white/70 group-hover:bg-white/[0.06] transition-colors"
+              onClick={(e) => { e.stopPropagation(); setSidebarOpen(true); }}
+            >
+              <PanelLeftOpen className="w-4 h-4" />
+            </button>
+
+            <div className="w-6 h-px bg-white/[0.08] rounded" />
+
+            {/* App icon */}
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center shadow-md shadow-indigo-500/20">
+              <Sparkles className="w-3.5 h-3.5 text-white" />
+            </div>
+
+            <div className="w-6 h-px bg-white/[0.08] rounded" />
+
+            {/* Icon hints */}
+            <div className="flex flex-col items-center gap-2">
+              {SESSIONS.slice(0, 3).map((s) => (
+                <div
+                  key={s.label}
+                  className="w-7 h-7 flex items-center justify-center rounded-lg text-white/20 group-hover:text-white/40 transition-colors"
+                  title={s.label}
+                >
+                  <MessageSquare className="w-3.5 h-3.5" />
+                </div>
+              ))}
+            </div>
+
+            {/* Settings at bottom */}
+            <div className="mt-auto mb-1">
+              <div className="w-7 h-7 flex items-center justify-center rounded-lg text-white/20 group-hover:text-white/40 transition-colors">
+                <Settings className="w-3.5 h-3.5" />
+              </div>
+            </div>
+          </div>
+        )}
       </aside>
 
       {/* Main Content */}
       <main className="flex-1 flex flex-col min-w-0">
         {/* Top Bar */}
-        <header className="flex items-center justify-between px-6 py-3 border-b border-white/[0.06] bg-[#0f1117]">
+        <header className="flex items-center justify-between px-4 py-3 border-b border-white/[0.06] bg-[#0f1117]">
           <div className="flex items-center gap-3">
+            {/* Open sidebar toggle — only visible when sidebar is closed */}
+            {!sidebarOpen && (
+              <button
+                onClick={() => setSidebarOpen(true)}
+                className="w-8 h-8 flex items-center justify-center rounded-lg text-white/30 hover:text-white/70 hover:bg-white/[0.06] transition-colors"
+                title="Open sidebar"
+              >
+                <PanelLeftOpen className="w-4 h-4" />
+              </button>
+            )}
             <div>
-              <h1 className="text-sm font-semibold">PID Control Study</h1>
+              <h1 className="text-sm font-semibold">{activeChat}</h1>
               <p className="text-[11px] text-white/35">4 messages · 2 memory items referenced</p>
             </div>
           </div>
