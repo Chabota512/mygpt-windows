@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import {
   GraduationCap, Send, FileText, Image, BookOpen, Settings,
   ChevronRight, Paperclip, MoreHorizontal, WifiOff, Download,
@@ -7,8 +7,25 @@ import {
   PenLine, Calculator, ChevronUp, Search,
   ExternalLink, CheckCircle2, Circle, Loader2,
   FlaskConical, TrendingUp, Scale, Stethoscope, BarChart2,
-  GripHorizontal, Minimize2, Sun, Moon, ZoomIn, ZoomOut
+  GripHorizontal, Minimize2, Sun, Moon, ZoomIn, ZoomOut,
+  User as UserIcon, Camera, Trash2
 } from "lucide-react";
+
+type UserProfile = { name: string; career: string; avatar: string | null };
+const PROFILE_STORAGE_KEY = "student-ai-user-profile";
+const DEFAULT_PROFILE: UserProfile = { name: "Student", career: "", avatar: null };
+const CAREER_SUGGESTIONS = [
+  "Engineering Student", "Medical Student", "Law Student", "Business Student",
+  "Computer Science Student", "Humanities Student", "Statistics / Data Student",
+  "High School Student", "PhD Researcher",
+];
+
+function getInitials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "S";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
 
 /* ─────────────── Types ─────────────── */
 type Message = { id: number; role: "user" | "assistant"; content: string; timestamp: string };
@@ -226,6 +243,46 @@ export function MainApp() {
   const [calcPos, setCalcPos] = useState({ x: 320, y: 80 });
   const [calcSize, setCalcSize] = useState({ w: 310, h: 490 });
   const [uiScale, setUiScale] = useState(1);
+
+  /* User profile */
+  const [profile, setProfile] = useState<UserProfile>(() => {
+    if (typeof window === "undefined") return DEFAULT_PROFILE;
+    try {
+      const raw = window.localStorage.getItem(PROFILE_STORAGE_KEY);
+      if (!raw) return DEFAULT_PROFILE;
+      const parsed = JSON.parse(raw);
+      return {
+        name: typeof parsed.name === "string" ? parsed.name : DEFAULT_PROFILE.name,
+        career: typeof parsed.career === "string" ? parsed.career : DEFAULT_PROFILE.career,
+        avatar: typeof parsed.avatar === "string" ? parsed.avatar : null,
+      };
+    } catch { return DEFAULT_PROFILE; }
+  });
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [profileDraft, setProfileDraft] = useState<UserProfile>(profile);
+  const avatarFileRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    try { window.localStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(profile)); } catch {}
+  }, [profile]);
+  const openProfile = () => { setProfileDraft(profile); setProfileOpen(true); };
+  const closeProfile = () => setProfileOpen(false);
+  const saveProfile = () => {
+    setProfile({
+      name: profileDraft.name.trim() || DEFAULT_PROFILE.name,
+      career: profileDraft.career.trim(),
+      avatar: profileDraft.avatar,
+    });
+    setProfileOpen(false);
+  };
+  const handleAvatarFile = (file: File | null) => {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) return;
+    if (file.size > 2 * 1024 * 1024) return;
+    const reader = new FileReader();
+    reader.onload = () => setProfileDraft(d => ({ ...d, avatar: typeof reader.result === "string" ? reader.result : d.avatar }));
+    reader.readAsDataURL(file);
+  };
+  const userInitials = getInitials(profile.name);
   const ZOOM_MIN = 0.75;
   const ZOOM_MAX = 1.5;
   const ZOOM_STEP = 0.1;
@@ -436,6 +493,22 @@ export function MainApp() {
             <button className={`w-8 h-8 flex items-center justify-center rounded-lg ${c.bgMuted} ${c.hoverMed} ${c.textMuted} transition-colors`}>
               <MoreHorizontal className="w-4 h-4" />
             </button>
+            {/* User profile button */}
+            <button
+              onClick={openProfile}
+              className={`flex items-center gap-2 pl-1 pr-2.5 py-1 rounded-full ${c.bgMuted} border ${c.border} ${c.hoverMuted} transition-colors`}
+              title="Edit your profile"
+              aria-label="Open user profile"
+            >
+              {profile.avatar ? (
+                <img src={profile.avatar} alt="" className="w-6 h-6 rounded-full object-cover" />
+              ) : (
+                <span className="w-6 h-6 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 text-white text-[10px] font-semibold flex items-center justify-center">
+                  {userInitials}
+                </span>
+              )}
+              <span className={`text-[11px] font-medium max-w-[110px] truncate ${c.textMd}`}>{profile.name}</span>
+            </button>
             {!rightOpen && (
               <button onClick={() => setRightOpen(true)} className={`w-8 h-8 flex items-center justify-center rounded-lg ${c.textGhost} ${c.hoverMuted} transition-colors`}>
                 <PanelRightOpen className="w-4 h-4" />
@@ -531,6 +604,11 @@ export function MainApp() {
                   </div>
                 )}
                 <div className={`max-w-[75%] ${msg.role === "user" ? "order-first" : ""}`}>
+                  {msg.role === "user" && (
+                    <p className={`text-[11px] font-semibold mb-1 text-right ${c.textMd}`}>
+                      {profile.name}{profile.career ? <span className={`font-normal ${c.textFaint}`}> · {profile.career}</span> : null}
+                    </p>
+                  )}
                   <div className={`rounded-2xl px-4 py-3 text-sm leading-relaxed ${msg.role === "user" ? c.userMsg : c.assistMsg}`}>
                     {msg.content.split("\n").map((line, i) => {
                       const html = line.replace(/\*\*(.*?)\*\*/g,"<strong>$1</strong>").replace(/\*(.*?)\*/g,"<em>$1</em>");
@@ -540,7 +618,11 @@ export function MainApp() {
                   <p className={`text-[10px] mt-1 ${c.textXs} ${msg.role === "user" ? "text-right" : "text-left"}`}>{msg.timestamp}</p>
                 </div>
                 {msg.role === "user" && (
-                  <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-slate-500 to-slate-600 flex items-center justify-center flex-shrink-0 mt-0.5 text-xs font-semibold text-white">S</div>
+                  profile.avatar ? (
+                    <img src={profile.avatar} alt="" className="w-7 h-7 rounded-lg object-cover flex-shrink-0 mt-0.5" />
+                  ) : (
+                    <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center flex-shrink-0 mt-0.5 text-[11px] font-semibold text-white shadow-md shadow-indigo-500/20">{userInitials}</div>
+                  )
                 )}
               </div>
             ))}
@@ -857,6 +939,121 @@ export function MainApp() {
               <path d="M8 0 L8 8 L0 8" stroke="currentColor" strokeWidth="1.5" fill="none" />
               <path d="M8 4 L8 8 L4 8" stroke="currentColor" strokeWidth="1.5" fill="none" />
             </svg>
+          </div>
+        </div>
+      )}
+
+      {/* ══ PROFILE MODAL ══ */}
+      {profileOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+          onClick={closeProfile}
+          role="dialog"
+          aria-modal="true"
+        >
+          <div
+            className={`w-full max-w-md rounded-2xl border ${c.borderMd} ${c.card} shadow-2xl overflow-hidden`}
+            onClick={e => e.stopPropagation()}
+          >
+            <div className={`flex items-center justify-between px-5 py-4 border-b ${c.border}`}>
+              <div className="flex items-center gap-2">
+                <UserIcon className={`w-4 h-4 ${c.textMd}`} />
+                <h2 className={`text-sm font-semibold ${c.text}`}>Your profile</h2>
+              </div>
+              <button
+                onClick={closeProfile}
+                className={`w-7 h-7 flex items-center justify-center rounded-lg ${c.textMuted} ${c.hoverMuted} transition-colors`}
+                aria-label="Close"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="px-5 py-5 space-y-5">
+              {/* Avatar editor */}
+              <div className="flex items-center gap-4">
+                <div className="relative">
+                  {profileDraft.avatar ? (
+                    <img src={profileDraft.avatar} alt="" className="w-20 h-20 rounded-2xl object-cover" />
+                  ) : (
+                    <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 text-white text-2xl font-semibold flex items-center justify-center shadow-md shadow-indigo-500/20">
+                      {getInitials(profileDraft.name || "S")}
+                    </div>
+                  )}
+                  <button
+                    onClick={() => avatarFileRef.current?.click()}
+                    className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-indigo-600 hover:bg-indigo-500 text-white flex items-center justify-center shadow-md"
+                    title="Upload a photo"
+                    aria-label="Upload profile photo"
+                  >
+                    <Camera className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+                <div className="flex-1">
+                  <p className={`text-xs font-medium ${c.textMd}`}>Profile photo</p>
+                  <p className={`text-[11px] mt-0.5 ${c.textFaint}`}>PNG or JPG, up to 2MB. Optional — your initials show otherwise.</p>
+                  {profileDraft.avatar && (
+                    <button
+                      onClick={() => setProfileDraft(d => ({ ...d, avatar: null }))}
+                      className={`mt-2 inline-flex items-center gap-1 text-[11px] ${c.textMuted} hover:text-rose-400 transition-colors`}
+                    >
+                      <Trash2 className="w-3 h-3" /> Remove photo
+                    </button>
+                  )}
+                  <input
+                    ref={avatarFileRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={e => { handleAvatarFile(e.target.files?.[0] ?? null); e.target.value = ""; }}
+                  />
+                </div>
+              </div>
+
+              {/* Name */}
+              <div>
+                <label className={`block text-[11px] font-medium mb-1.5 ${c.textMd}`}>Your name</label>
+                <input
+                  type="text"
+                  value={profileDraft.name}
+                  onChange={e => setProfileDraft(d => ({ ...d, name: e.target.value }))}
+                  placeholder="e.g. Alex Johnson"
+                  className={`w-full px-3 py-2 rounded-lg text-sm outline-none ${c.inputWrap} border ${c.borderMd} ${c.inputFocus} ${c.text}`}
+                />
+              </div>
+
+              {/* Career */}
+              <div>
+                <label className={`block text-[11px] font-medium mb-1.5 ${c.textMd}`}>Field of study or career</label>
+                <input
+                  type="text"
+                  list="career-suggestions"
+                  value={profileDraft.career}
+                  onChange={e => setProfileDraft(d => ({ ...d, career: e.target.value }))}
+                  placeholder="e.g. Engineering Student"
+                  className={`w-full px-3 py-2 rounded-lg text-sm outline-none ${c.inputWrap} border ${c.borderMd} ${c.inputFocus} ${c.text}`}
+                />
+                <datalist id="career-suggestions">
+                  {CAREER_SUGGESTIONS.map(s => <option key={s} value={s} />)}
+                </datalist>
+                <p className={`text-[11px] mt-1.5 ${c.textFaint}`}>Helps tailor explanations, calculators and templates to your subject.</p>
+              </div>
+            </div>
+
+            <div className={`flex items-center justify-end gap-2 px-5 py-3 border-t ${c.border} ${c.bgSub}`}>
+              <button
+                onClick={closeProfile}
+                className={`px-3 py-1.5 rounded-lg text-xs ${c.textMuted} ${c.hoverMuted} transition-colors`}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={saveProfile}
+                className="px-4 py-1.5 rounded-lg text-xs font-medium bg-indigo-600 hover:bg-indigo-500 text-white transition-colors"
+              >
+                Save profile
+              </button>
+            </div>
           </div>
         </div>
       )}
