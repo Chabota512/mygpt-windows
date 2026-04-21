@@ -337,6 +337,100 @@ export function MainApp() {
   /* Empty / first-run chat & thinking state */
   const [isEmptyChat, setIsEmptyChat] = useState(false);
   const [isThinking, setIsThinking] = useState(false);
+
+  /* ─── Backend wiring (talks to local Python FastAPI on the user's PC) ─── */
+  const API_BASE =
+    (import.meta as unknown as { env?: { VITE_API_BASE?: string } }).env
+      ?.VITE_API_BASE ?? "http://localhost:8000";
+  const [messages, setMessages] = useState<Message[]>(DEMO_MESSAGES);
+  const [backendError, setBackendError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const nowStamp = () =>
+    new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+
+  async function sendToBackend(text: string) {
+    const trimmed = text.trim();
+    if (!trimmed) return;
+
+    const userMsg: Message = {
+      id: Date.now(),
+      role: "user",
+      content: trimmed,
+      timestamp: nowStamp(),
+    };
+    setMessages(prev => [...prev, userMsg]);
+    setInput("");
+    setIsEmptyChat(false);
+    setIsThinking(true);
+    setBackendError(null);
+
+    try {
+      const res = await fetch(`${API_BASE}/chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: trimmed,
+          history: messages.map(m => ({ role: m.role, content: m.content })),
+        }),
+      });
+      if (!res.ok) throw new Error(`Backend returned ${res.status}`);
+      const data = (await res.json()) as { reply: string; timestamp: string };
+      setMessages(prev => [
+        ...prev,
+        {
+          id: Date.now() + 1,
+          role: "assistant",
+          content: data.reply,
+          timestamp: data.timestamp ?? nowStamp(),
+        },
+      ]);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setBackendError(msg);
+      setMessages(prev => [
+        ...prev,
+        {
+          id: Date.now() + 1,
+          role: "assistant",
+          content:
+            `*(Couldn't reach the local backend at ${API_BASE}.)*\n\n` +
+            "Start the Python server: open `python-backend/` and run " +
+            "`python main.py`. Once it's listening on port 8000, try again.",
+          timestamp: nowStamp(),
+        },
+      ]);
+    } finally {
+      setIsThinking(false);
+    }
+  }
+
+  async function uploadPdfToBackend(file: File) {
+    setBackendError(null);
+    const fd = new FormData();
+    fd.append("file", file);
+    try {
+      const res = await fetch(`${API_BASE}/upload-pdf`, { method: "POST", body: fd });
+      if (!res.ok) throw new Error(`Upload failed (${res.status})`);
+      const data = (await res.json()) as { filename: string; size_bytes: number };
+      setMessages(prev => [
+        ...prev,
+        {
+          id: Date.now(),
+          role: "assistant",
+          content:
+            `Added **${data.filename}** to your local memory ` +
+            `(${Math.round(data.size_bytes / 1024)} KB). ` +
+            "I can now reference it in our chat.",
+          timestamp: nowStamp(),
+        },
+      ]);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setBackendError(msg);
+    }
+  }
+
   const sendSuggestion = (text: string) => {
     setIsEmptyChat(false);
     setInput("");
@@ -846,7 +940,7 @@ export function MainApp() {
             </div>
 
             {/* Messages */}
-            {DEMO_MESSAGES.map(msg => (
+            {messages.map(msg => (
               <div key={msg.id} className={`flex gap-3 ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
                 {msg.role === "assistant" && (
                   <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center flex-shrink-0 mt-0.5 shadow-md shadow-indigo-500/20">
@@ -1029,19 +1123,49 @@ export function MainApp() {
             </button>
             <div className={`flex-1 flex flex-col rounded-2xl ${c.inputWrap} border ${c.borderMd} ${c.inputFocus} transition-colors overflow-hidden`}>
               <textarea rows={2} value={input} onChange={e => setInput(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    sendToBackend(input);
+                  }
+                }}
                 placeholder={activeTool === "Write Doc" ? "Describe the document you want written..." : activeTool === "Calculator" ? "Type a calculation or use the floating calculator..." : activeTool === "Search Notes" ? "Type to search your notes and files..." : "Ask anything, attach images or PDFs..."}
                 className={`flex-1 bg-transparent text-sm resize-none outline-none leading-relaxed px-4 pt-3 pb-1 ${c.textMd} placeholder:${c.textGhost}`} />
               <div className="flex items-center gap-1 px-3 pb-2">
-                {[Paperclip, Image, Mic].map((Icon, i) => (
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  title="Upload PDF / image to local memory"
+                  className={`w-7 h-7 flex items-center justify-center rounded-lg ${c.textGhost} ${c.hoverMuted} transition-colors`}>
+                  <Paperclip className="w-3.5 h-3.5" />
+                </button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".pdf,image/*"
+                  className="hidden"
+                  onChange={e => {
+                    const f = e.target.files?.[0];
+                    if (f) uploadPdfToBackend(f);
+                    if (e.target) e.target.value = "";
+                  }} />
+                {[Image, Mic].map((Icon, i) => (
                   <button key={i} className={`w-7 h-7 flex items-center justify-center rounded-lg ${c.textGhost} ${c.hoverMuted} transition-colors`}><Icon className="w-3.5 h-3.5" /></button>
                 ))}
               </div>
             </div>
-            <button className="w-10 h-10 flex items-center justify-center rounded-xl bg-indigo-600 hover:bg-indigo-500 transition-colors shadow-md shadow-indigo-500/20 flex-shrink-0 mb-0.5">
+            <button
+              onClick={() => sendToBackend(input)}
+              disabled={isThinking || !input.trim()}
+              className="w-10 h-10 flex items-center justify-center rounded-xl bg-indigo-600 hover:bg-indigo-500 transition-colors shadow-md shadow-indigo-500/20 flex-shrink-0 mb-0.5 disabled:opacity-50 disabled:cursor-not-allowed">
               <Send className="w-4 h-4 text-white" />
             </button>
           </div>
-          <p className={`text-[10px] mt-2.5 px-1 ${c.textGhost}`}>All processing is done locally · No internet needed</p>
+          <p className={`text-[10px] mt-2.5 px-1 ${c.textGhost}`}>
+            All processing is done locally · No internet needed
+            {backendError && (
+              <span className="text-rose-400"> · backend offline ({backendError})</span>
+            )}
+          </p>
         </div>
       </main>
 
