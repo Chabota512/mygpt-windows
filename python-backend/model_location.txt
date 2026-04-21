@@ -1,0 +1,21 @@
+# My_GPT 4 Students — where to keep the AI model
+#
+# Lines starting with # are ignored.
+# Put ONE folder path on its own line, and the app will look for the offline
+# AI model there (instead of re-downloading it).
+#
+# This is the "carry it once, install on any PC" trick:
+#   1. On your own PC, download the model once (with Ollama or as plain files).
+#   2. Copy that whole model folder to your external/USB drive.
+#   3. On a friend's PC, install the small app, plug in the drive, and put
+#      the path to the model folder on a line below.
+#   4. Start the app — no internet, no re-download.
+#
+# Examples:
+#   E:\MyGPTModels
+#   D:\Studies\MyGPT\models
+#   /Volumes/MyUSB/MyGPTModels
+#
+# If you leave this file as-is, the app looks for models inside its own
+# "models" subfolder.
+
