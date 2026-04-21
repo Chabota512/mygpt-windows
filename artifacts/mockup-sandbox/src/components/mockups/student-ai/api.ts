@@ -116,4 +116,15 @@ export const api = {
     }).then(j<ApiDocument>),
   deleteDocument: (id: string) =>
     fetch(`${API_BASE}/documents/${id}`, { method: "DELETE" }).then(j<{ ok: true }>),
+
+  // ── Profile ───────────────────────────────────────────────
+  getProfile: () => fetch(`${API_BASE}/profile`).then(j<ApiProfile>),
+  putProfile: (p: ApiProfile) =>
+    fetch(`${API_BASE}/profile`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(p),
+    }).then(j<ApiProfile>),
 };
+
+export type ApiProfile = { name: string; career: string; avatar: string | null };

@@ -293,13 +293,15 @@ export function MainApp() {
   }, [profile]);
   const openProfile = () => { setProfileDraft(profile); setProfileOpen(true); };
   const closeProfile = () => setProfileOpen(false);
-  const saveProfile = () => {
-    setProfile({
+  const saveProfile = async () => {
+    const next: UserProfile = {
       name: profileDraft.name.trim() || DEFAULT_PROFILE.name,
       career: profileDraft.career.trim(),
       avatar: profileDraft.avatar,
-    });
+    };
+    setProfile(next);
     setProfileOpen(false);
+    try { await api.putProfile(next); } catch { /* offline — localStorage already cached it */ }
   };
   const handleAvatarFile = (file: File | null) => {
     if (!file) return;
@@ -422,6 +424,11 @@ export function MainApp() {
       const list = await refreshSessions();
       await refreshMemory();
       await refreshDocuments();
+      try {
+        const p = await api.getProfile();
+        const isDefault = (!p.name || p.name === DEFAULT_PROFILE.name) && !p.career && !p.avatar;
+        if (!isDefault) setProfile({ name: p.name, career: p.career, avatar: p.avatar });
+      } catch { /* offline — keep localStorage profile */ }
       if (list.length > 0) {
         const first = list[0];
         setCurrentSessionId(first.id);
@@ -965,6 +972,14 @@ export function MainApp() {
             >
               <Settings className="w-4 h-4" />
             </button>
+            {/* Backend status dot — green = local server reachable, amber = offline */}
+            <span
+              title={backendOnline
+                ? "Local backend connected (offline-ready)"
+                : `Local backend offline — start python-backend/main.py${backendError ? ` · ${backendError}` : ""}`}
+              className={`w-2 h-2 rounded-full ${backendOnline ? "bg-emerald-500" : "bg-amber-500 animate-pulse"}`}
+              aria-label={backendOnline ? "Backend connected" : "Backend offline"}
+            />
             {/* User profile button */}
             <button
               onClick={openProfile}
