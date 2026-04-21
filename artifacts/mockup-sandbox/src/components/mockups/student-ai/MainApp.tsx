@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
 import {
-  Sparkles, Send, FileText, Image, BookOpen, Settings,
+  GraduationCap, Send, FileText, Image, BookOpen, Settings,
   ChevronRight, Paperclip, MoreHorizontal, WifiOff, Download,
   MessageSquare, X, Plus, Mic, Layers,
   PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen,
@@ -283,7 +283,7 @@ export function MainApp() {
             <div className={`px-4 py-4 border-b ${c.border} flex items-center justify-between`}>
               <div className="flex items-center gap-2.5">
                 <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center shadow-lg shadow-indigo-500/20 flex-shrink-0">
-                  <Sparkles className="w-4 h-4 text-white" />
+                  <GraduationCap className="w-4 h-4 text-white" />
                 </div>
                 <div>
                   <p className={`text-sm tracking-tight whitespace-nowrap ${c.text}`}>
@@ -354,7 +354,7 @@ export function MainApp() {
             </button>
             <div className={`w-6 h-px ${c.dot} rounded`} />
             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center shadow-md shadow-indigo-500/20">
-              <Sparkles className="w-3.5 h-3.5 text-white" />
+              <GraduationCap className="w-3.5 h-3.5 text-white" />
             </div>
             <div className={`w-6 h-px ${c.dot} rounded`} />
             <div className="flex flex-col items-center gap-2">
@@ -491,7 +491,7 @@ export function MainApp() {
               <div key={msg.id} className={`flex gap-3 ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
                 {msg.role === "assistant" && (
                   <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center flex-shrink-0 mt-0.5 shadow-md shadow-indigo-500/20">
-                    <Sparkles className="w-3.5 h-3.5 text-white" />
+                    <GraduationCap className="w-3.5 h-3.5 text-white" />
                   </div>
                 )}
                 <div className={`max-w-[75%] ${msg.role === "user" ? "order-first" : ""}`}>
@@ -513,7 +513,7 @@ export function MainApp() {
             {activeTool === "Write Doc" ? (
               <div className="flex gap-3 justify-start">
                 <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center flex-shrink-0 mt-0.5 shadow-md shadow-indigo-500/20">
-                  <Sparkles className="w-3.5 h-3.5 text-white" />
+                  <GraduationCap className="w-3.5 h-3.5 text-white" />
                 </div>
                 <div className="flex-1 max-w-[85%]">
                   <div className={`rounded-2xl px-4 py-3 text-sm mb-3 leading-relaxed ${c.assistMsg}`}>
@@ -575,7 +575,7 @@ export function MainApp() {
               /* Typing indicator */
               <div className="flex gap-3 justify-start">
                 <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center flex-shrink-0 shadow-md shadow-indigo-500/20">
-                  <Sparkles className="w-3.5 h-3.5 text-white" />
+                  <GraduationCap className="w-3.5 h-3.5 text-white" />
                 </div>
                 <div className={`${c.card} border ${c.border} rounded-2xl rounded-tl-sm px-4 py-3`}>
                   <div className="flex gap-1 items-center h-4">
