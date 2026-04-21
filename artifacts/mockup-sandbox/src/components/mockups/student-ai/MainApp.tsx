@@ -4,6 +4,7 @@ import {
   API_BASE,
   type ApiSession,
   type ApiStorageInfo,
+  type ApiModelStorageInfo,
   type ApiMemoryItem,
   type ApiSearchHit,
   type ApiDocument,
@@ -622,13 +623,21 @@ export function MainApp() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [storage, setStorage] = useState<ApiStorageInfo | null>(null);
   const [storageLoading, setStorageLoading] = useState(false);
+  const [modelStorage, setModelStorage] = useState<ApiModelStorageInfo | null>(null);
+  const [modelStorageLoading, setModelStorageLoading] = useState(false);
   const refreshStorage = useCallback(async () => {
     setStorageLoading(true);
     try { setStorage(await api.getStorage()); }
     catch { setStorage(null); }
     finally { setStorageLoading(false); }
   }, []);
-  useEffect(() => { if (settingsOpen) refreshStorage(); }, [settingsOpen, refreshStorage]);
+  const refreshModelStorage = useCallback(async () => {
+    setModelStorageLoading(true);
+    try { setModelStorage(await api.getModelStorage()); }
+    catch { setModelStorage(null); }
+    finally { setModelStorageLoading(false); }
+  }, []);
+  useEffect(() => { if (settingsOpen) { refreshStorage(); refreshModelStorage(); } }, [settingsOpen, refreshStorage, refreshModelStorage]);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
 
   /* Onboarding banner */
@@ -1757,8 +1766,61 @@ export function MainApp() {
                     <p className={`text-xs font-medium ${c.text}`}>Llama 3.1 · 8B Q4</p>
                     <p className={`text-[11px] mt-0.5 ${c.textFaint}`}>3.2 GB / 5.1 GB VRAM · Running locally</p>
                   </div>
-                  <button className={`px-3 py-1.5 rounded-lg text-[11px] font-medium border ${c.border} ${c.textBody} ${c.hoverMuted}`}>Change</button>
+                  <button
+                    onClick={refreshModelStorage}
+                    className={`px-3 py-1.5 rounded-lg text-[11px] font-medium border ${c.border} ${c.textBody} ${c.hoverMuted}`}
+                  >
+                    Check
+                  </button>
                 </div>
+              </section>
+
+              {/* Model storage */}
+              <section>
+                <h3 className={`text-[11px] uppercase tracking-widest font-semibold mb-3 ${c.textFaint}`}>Model folder</h3>
+                {!modelStorage && modelStorageLoading && (
+                  <div className={`rounded-xl border ${c.border} ${c.bgMuted} p-3 flex items-center gap-3`}>
+                    <Loader2 className="w-4 h-4 text-indigo-500 animate-spin" />
+                    <p className={`text-[11px] ${c.textFaint}`}>Checking where the model lives…</p>
+                  </div>
+                )}
+                {modelStorage && (
+                  <div className={`rounded-xl border ${c.border} ${c.bgMuted} p-3.5`}>
+                    <div className="flex items-start gap-3">
+                      <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${modelStorage.on_external ? "bg-amber-500/15" : "bg-indigo-500/15"}`}>
+                        {modelStorage.on_external
+                          ? <Usb className="w-4 h-4 text-amber-500" />
+                          : <HardDrive className="w-4 h-4 text-indigo-500" />}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className={`text-xs font-medium ${c.text}`}>
+                            {modelStorage.on_external ? "Model on external drive" : "Model on this computer"}
+                          </p>
+                          <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${modelStorage.on_external ? "bg-amber-500/15 text-amber-600" : "bg-emerald-500/15 text-emerald-600"}`}>
+                            {modelStorage.has_models ? "Ready" : "No model found"}
+                          </span>
+                        </div>
+                        <p className={`text-[11px] mt-0.5 font-mono break-all ${c.textFaint}`} title={modelStorage.model_dir}>{modelStorage.model_dir}</p>
+                      </div>
+                    </div>
+                    <div className="mt-3.5 grid grid-cols-2 gap-2 text-[11px]">
+                      <div className={`rounded-lg ${c.bgSub} border ${c.border} px-2.5 py-2`}>
+                        <p className={`text-[10px] ${c.textFaint}`}>Model files</p>
+                        <p className={`font-semibold ${c.text}`}>{modelStorage.model_count}</p>
+                      </div>
+                      <div className={`rounded-lg ${c.bgSub} border ${c.border} px-2.5 py-2`}>
+                        <p className={`text-[10px] ${c.textFaint}`}>Used space</p>
+                        <p className={`font-semibold ${c.text}`}>{modelStorage.used_human}</p>
+                      </div>
+                    </div>
+                    <div className="mt-3">
+                      <p className={`text-[11px] ${c.textFaint}`}>
+                        Put your model folder on a drive you carry with you, then point the app at it once.
+                      </p>
+                    </div>
+                  </div>
+                )}
               </section>
 
               {/* Storage location */}

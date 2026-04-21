@@ -53,6 +53,7 @@ import uvicorn
 # ──────────────────────────────────────────────────────────────────────
 ROOT = Path(__file__).parent
 LOCATION_FILE = ROOT / "data_location.txt"
+MODEL_LOCATION_FILE = ROOT / "model_location.txt"
 
 
 def resolve_data_dir() -> Path:
@@ -68,9 +69,24 @@ def resolve_data_dir() -> Path:
     return (ROOT / "data").resolve()
 
 
+def resolve_model_dir() -> Path:
+    env = os.environ.get("MYGPT_MODEL_DIR", "").strip()
+    if env:
+        return Path(env).expanduser().resolve()
+    if MODEL_LOCATION_FILE.exists():
+        line = MODEL_LOCATION_FILE.read_text("utf-8").strip().splitlines()
+        for raw in line:
+            raw = raw.strip()
+            if raw and not raw.startswith("#"):
+                return Path(raw).expanduser().resolve()
+    return (ROOT / "models").resolve()
+
+
 DATA_DIR = resolve_data_dir()
+MODEL_DIR = resolve_model_dir()
 try:
     DATA_DIR.mkdir(parents=True, exist_ok=True)
+    MODEL_DIR.mkdir(parents=True, exist_ok=True)
 except OSError as e:
     raise SystemExit(
         f"Could not create data folder at {DATA_DIR}.\n"
@@ -86,6 +102,7 @@ UPLOAD_DIR.mkdir(exist_ok=True)
 EXPORT_DIR.mkdir(exist_ok=True)
 
 print(f"[My_GPT] Data folder: {DATA_DIR}")
+print(f"[My_GPT] Model folder: {MODEL_DIR}")
 
 
 def _dir_size(p: Path) -> int:
@@ -786,6 +803,20 @@ class StorageInfo(BaseModel):
     document_count: int
 
 
+class ModelInfo(BaseModel):
+    model_dir: str
+    on_external: bool
+    location_file: str
+    has_models: bool
+    model_count: int
+    used_bytes: int
+    used_human: str
+    free_bytes: int
+    free_human: str
+    total_bytes: int
+    total_human: str
+
+
 @app.get("/storage", response_model=StorageInfo)
 def storage_info():
     import shutil
@@ -822,6 +853,47 @@ def storage_info():
         location_file=str(LOCATION_FILE),
         memory_count=mem,
         document_count=docs,
+    )
+
+
+@app.get("/model-storage", response_model=ModelInfo)
+def model_storage():
+    import shutil
+
+    used = _dir_size(MODEL_DIR)
+    try:
+        usage = shutil.disk_usage(str(MODEL_DIR))
+        free, total = usage.free, usage.total
+    except OSError:
+        free, total = 0, 0
+
+    on_external = False
+    try:
+        on_external = Path(MODEL_DIR).resolve().drive != ROOT.resolve().drive
+        if not on_external:
+            s = str(MODEL_DIR).lower()
+            on_external = any(s.startswith(p) for p in ("/volumes/", "/media/", "/mnt/"))
+    except Exception:
+        pass
+
+    model_count = 0
+    try:
+        model_count = sum(1 for p in MODEL_DIR.rglob("*") if p.is_file())
+    except OSError:
+        model_count = 0
+
+    return ModelInfo(
+        model_dir=str(MODEL_DIR),
+        on_external=on_external,
+        location_file=str(MODEL_LOCATION_FILE),
+        has_models=MODEL_DIR.exists() and any(MODEL_DIR.iterdir()),
+        model_count=model_count,
+        used_bytes=used,
+        used_human=_human_bytes(used),
+        free_bytes=free,
+        free_human=_human_bytes(free),
+        total_bytes=total,
+        total_human=_human_bytes(total),
     )
 
 

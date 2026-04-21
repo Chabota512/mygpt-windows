@@ -119,6 +119,7 @@ export const api = {
 
   // ── Storage ───────────────────────────────────────────────
   getStorage: () => fetch(`${API_BASE}/storage`).then(j<ApiStorageInfo>),
+  getModelStorage: () => fetch(`${API_BASE}/model-storage`).then(j<ApiModelStorageInfo>),
 
   // ── Profile ───────────────────────────────────────────────
   getProfile: () => fetch(`${API_BASE}/profile`).then(j<ApiProfile>),
@@ -144,4 +145,18 @@ export type ApiStorageInfo = {
   location_file: string;
   memory_count: number;
   document_count: number;
+};
+
+export type ApiModelStorageInfo = {
+  model_dir: string;
+  on_external: boolean;
+  location_file: string;
+  has_models: boolean;
+  model_count: number;
+  used_bytes: number;
+  used_human: string;
+  free_bytes: number;
+  free_human: string;
+  total_bytes: number;
+  total_human: string;
 };
