@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import {
   api,
   API_BASE,
@@ -631,6 +631,60 @@ export function MainApp() {
   };
   const showOnboarding = !onboardDismissed && (profile.name === DEFAULT_PROFILE.name || !profile.career);
 
+  /* First-time welcome card (one-time, friendly) */
+  const [welcomeOpen, setWelcomeOpen] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return window.localStorage.getItem("student-ai-welcomed") !== "1";
+  });
+  const closeWelcome = () => {
+    setWelcomeOpen(false);
+    try { window.localStorage.setItem("student-ai-welcomed", "1"); } catch {}
+  };
+
+  /* Rotating greetings — picked fresh on every app open. Some mention offline. */
+  const greeting = useMemo(() => {
+    const first = profile.name === DEFAULT_PROFILE.name ? "there" : profile.name.split(/\s+/)[0];
+    const hour = new Date().getHours();
+    const timeWord = hour < 5 ? "Burning the midnight oil"
+      : hour < 12 ? "Good morning"
+      : hour < 17 ? "Good afternoon"
+      : hour < 22 ? "Good evening"
+      : "Late-night study session";
+
+    const pool: { title: string; subtitle: string }[] = [
+      { title: `Hi ${first} — what are we studying today?`,
+        subtitle: "Ask anything, drop in your notes, or pick a quick start below." },
+      { title: `${timeWord}, ${first}! Ready to learn something?`,
+        subtitle: "I'm right here on your computer — no internet needed." },
+      { title: `Welcome back, ${first} 👋`,
+        subtitle: "Pick up where you left off, or start something new." },
+      { title: `Hey ${first} — what's on the syllabus?`,
+        subtitle: "Drop in a PDF, ask a question, or generate a document." },
+      { title: `Let's tackle it, ${first} 💪`,
+        subtitle: "Tough subject? Easy one? Either way, I've got you." },
+      { title: `Offline and ready, ${first} 🔒`,
+        subtitle: "Your notes, your chats, your data — all stays on this computer." },
+      { title: `Hi ${first} — no Wi-Fi? No problem.`,
+        subtitle: "Everything I do works without an internet connection." },
+      { title: `${timeWord}, ${first}!`,
+        subtitle: "Ask, upload, or pick a quick start to get going." },
+      { title: `Ready when you are, ${first}`,
+        subtitle: "Try a question, or drop a PDF into our chat to get started." },
+      { title: `Coffee in hand, ${first}? ☕`,
+        subtitle: "Let's break down whatever you're studying — one step at a time." },
+      { title: `Hi ${first} — your private study buddy is here`,
+        subtitle: "Nothing leaves your computer. Ever. Promise." },
+      { title: `Hey ${first} — what shall we figure out today?`,
+        subtitle: "Big topics, tiny questions, or full essays — I'm up for it." },
+      { title: `${first}, let's make today productive ✨`,
+        subtitle: "Tip: drop your lecture notes into memory and I'll remember them." },
+      { title: `Plane mode? Library Wi-Fi down? All good, ${first}.`,
+        subtitle: "I run entirely on this computer — no internet required." },
+    ];
+    return pool[Math.floor(Math.random() * pool.length)];
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile.name]);
+
   const ZOOM_MIN = 0.75;
   const ZOOM_MAX = 1.5;
   const ZOOM_STEP = 0.1;
@@ -1129,10 +1183,10 @@ export function MainApp() {
                   <GraduationCap className="w-8 h-8 text-white" />
                 </div>
                 <h2 className={`text-xl font-semibold ${c.text}`}>
-                  Hi {profile.name === DEFAULT_PROFILE.name ? "there" : profile.name.split(/\s+/)[0]} — what are we studying today?
+                  {greeting.title}
                 </h2>
                 <p className={`text-sm mt-2 max-w-md ${c.textBody}`}>
-                  Ask anything, drop in your notes, or pick a quick start below. Everything runs locally on your machine.
+                  {greeting.subtitle}
                 </p>
                 <div className="grid grid-cols-2 gap-3 mt-8 w-full max-w-2xl">
                   {SUGGESTIONS.map(s => (
@@ -1767,6 +1821,66 @@ export function MainApp() {
                 ))}
               </ul>
               <p className={`text-[11px] mt-4 ${c.textFaint}`}>On macOS, use ⌘ instead of Ctrl.</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ══ ONE-TIME WELCOME CARD ══ */}
+      {welcomeOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+          onClick={closeWelcome}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Welcome"
+        >
+          <div
+            className={`w-full max-w-md rounded-2xl border ${c.borderMd} ${c.card} shadow-2xl overflow-hidden`}
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="px-6 pt-7 pb-5 text-center">
+              <div className="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center shadow-lg shadow-indigo-500/30 mb-4">
+                <GraduationCap className="w-8 h-8 text-white" />
+              </div>
+              <h2 className={`text-lg font-semibold ${c.text}`}>Welcome 👋</h2>
+              <p className={`text-sm mt-2 ${c.textBody}`}>
+                I'm your personal study buddy — and the best part?
+                <br />
+                <span className="font-semibold text-indigo-500">I work without internet.</span>
+              </p>
+              <div className={`mt-5 rounded-xl ${c.bgSub} border ${c.border} p-4 text-left space-y-2.5`}>
+                <div className="flex items-start gap-2.5">
+                  <span className="text-base leading-none mt-0.5">💬</span>
+                  <p className={`text-[12px] ${c.textBody}`}>Ask me anything — explanations, summaries, even step-by-step problems.</p>
+                </div>
+                <div className="flex items-start gap-2.5">
+                  <span className="text-base leading-none mt-0.5">📎</span>
+                  <p className={`text-[12px] ${c.textBody}`}>Drop in your notes or PDFs and I'll remember them.</p>
+                </div>
+                <div className="flex items-start gap-2.5">
+                  <span className="text-base leading-none mt-0.5">📝</span>
+                  <p className={`text-[12px] ${c.textBody}`}>I can write reports, summaries, or essays for you.</p>
+                </div>
+                <div className="flex items-start gap-2.5">
+                  <span className="text-base leading-none mt-0.5">🔒</span>
+                  <p className={`text-[12px] ${c.textBody}`}>Everything stays on this computer. Always.</p>
+                </div>
+              </div>
+            </div>
+            <div className={`px-6 pb-6 pt-2 flex flex-col gap-2`}>
+              <button
+                onClick={() => { closeWelcome(); openProfile(); }}
+                className="w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium transition-colors"
+              >
+                Let's get started
+              </button>
+              <button
+                onClick={closeWelcome}
+                className={`w-full py-2 rounded-xl text-[12px] ${c.textFaint} ${c.hoverSub} transition-colors`}
+              >
+                Skip for now
+              </button>
             </div>
           </div>
         </div>
