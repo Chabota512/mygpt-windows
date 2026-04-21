@@ -3,6 +3,7 @@ import {
   api,
   API_BASE,
   type ApiSession,
+  type ApiStorageInfo,
   type ApiMemoryItem,
   type ApiSearchHit,
   type ApiDocument,
@@ -16,7 +17,8 @@ import {
   ExternalLink, CheckCircle2, Circle, Loader2,
   FlaskConical, TrendingUp, Scale, Stethoscope, BarChart2,
   GripHorizontal, Minimize2, Sun, Moon, ZoomIn, ZoomOut,
-  User as UserIcon, Camera, Trash2, Pencil, Sparkles, Keyboard, Check
+  User as UserIcon, Camera, Trash2, Pencil, Sparkles, Keyboard, Check,
+  HardDrive, Usb,
 } from "lucide-react";
 
 type UserProfile = { name: string; career: string; avatar: string | null };
@@ -618,6 +620,15 @@ export function MainApp() {
 
   /* Settings & shortcuts help */
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [storage, setStorage] = useState<ApiStorageInfo | null>(null);
+  const [storageLoading, setStorageLoading] = useState(false);
+  const refreshStorage = useCallback(async () => {
+    setStorageLoading(true);
+    try { setStorage(await api.getStorage()); }
+    catch { setStorage(null); }
+    finally { setStorageLoading(false); }
+  }, []);
+  useEffect(() => { if (settingsOpen) refreshStorage(); }, [settingsOpen, refreshStorage]);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
 
   /* Onboarding banner */
@@ -1748,6 +1759,117 @@ export function MainApp() {
                   </div>
                   <button className={`px-3 py-1.5 rounded-lg text-[11px] font-medium border ${c.border} ${c.textBody} ${c.hoverMuted}`}>Change</button>
                 </div>
+              </section>
+
+              {/* Storage location */}
+              <section>
+                <h3 className={`text-[11px] uppercase tracking-widest font-semibold mb-3 ${c.textFaint}`}>Storage</h3>
+                {!storage && storageLoading && (
+                  <div className={`rounded-xl border ${c.border} ${c.bgMuted} p-3 flex items-center gap-3`}>
+                    <Loader2 className="w-4 h-4 text-indigo-500 animate-spin" />
+                    <p className={`text-[11px] ${c.textFaint}`}>Checking where your data lives…</p>
+                  </div>
+                )}
+                {!storage && !storageLoading && (
+                  <div className={`rounded-xl border ${c.border} ${c.bgMuted} p-3`}>
+                    <p className={`text-[11px] ${c.textFaint}`}>
+                      Couldn't read storage info right now. Try again in a moment.
+                    </p>
+                  </div>
+                )}
+                {storage && (() => {
+                  const usedPct = storage.total_bytes > 0
+                    ? Math.min(100, Math.max(2, (storage.used_bytes / storage.total_bytes) * 100))
+                    : 0;
+                  const lowSpace = storage.free_bytes > 0 && storage.free_bytes < 500 * 1024 * 1024; // < 500 MB
+                  return (
+                    <div className={`rounded-xl border ${c.border} ${c.bgMuted} p-3.5`}>
+                      <div className="flex items-start gap-3">
+                        <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${storage.on_external ? "bg-amber-500/15" : "bg-indigo-500/15"}`}>
+                          {storage.on_external
+                            ? <Usb className="w-4 h-4 text-amber-500" />
+                            : <HardDrive className="w-4 h-4 text-indigo-500" />}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className={`text-xs font-medium ${c.text}`}>
+                              {storage.on_external ? "External drive" : "This computer"}
+                            </p>
+                            <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${storage.on_external ? "bg-amber-500/15 text-amber-600" : "bg-emerald-500/15 text-emerald-600"}`}>
+                              {storage.on_external ? "Body on external" : "All on PC"}
+                            </span>
+                          </div>
+                          <p className={`text-[11px] mt-0.5 font-mono break-all ${c.textFaint}`} title={storage.data_dir}>{storage.data_dir}</p>
+                        </div>
+                        <button
+                          onClick={refreshStorage}
+                          className={`px-2 py-1 rounded-md text-[10px] font-medium border ${c.border} ${c.textBody} ${c.hoverMuted}`}
+                          title="Refresh"
+                        >Refresh</button>
+                      </div>
+
+                      <div className="mt-3.5">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className={`text-[10px] ${c.textFaint}`}>Used by My_GPT</span>
+                          <span className={`text-[10px] font-semibold ${c.textBody}`}>
+                            {storage.used_human}
+                            {storage.total_bytes > 0 && (
+                              <span className={`font-normal ${c.textFaint}`}> · {storage.free_human} free of {storage.total_human}</span>
+                            )}
+                          </span>
+                        </div>
+                        <div className={`w-full h-1.5 ${c.vramTrack} rounded-full overflow-hidden`}>
+                          <div
+                            className={`h-full rounded-full ${lowSpace ? "bg-gradient-to-r from-amber-500 to-rose-500" : "bg-gradient-to-r from-indigo-500 to-violet-500"}`}
+                            style={{ width: `${usedPct}%` }}
+                          />
+                        </div>
+                      </div>
+
+                      <div className={`mt-3 grid grid-cols-2 gap-2 text-[11px] ${c.textBody}`}>
+                        <div className={`rounded-lg ${c.bgSub} border ${c.border} px-2.5 py-2`}>
+                          <p className={`text-[10px] ${c.textFaint}`}>Memory items</p>
+                          <p className={`font-semibold ${c.text}`}>{storage.memory_count}</p>
+                        </div>
+                        <div className={`rounded-lg ${c.bgSub} border ${c.border} px-2.5 py-2`}>
+                          <p className={`text-[10px] ${c.textFaint}`}>Generated docs</p>
+                          <p className={`font-semibold ${c.text}`}>{storage.document_count}</p>
+                        </div>
+                      </div>
+
+                      {lowSpace && (
+                        <p className="mt-3 text-[11px] text-amber-600">
+                          Running low on space. Plug in an external drive and move your data — see how below.
+                        </p>
+                      )}
+
+                      <details className={`mt-3 group/det`}>
+                        <summary className={`cursor-pointer text-[11px] font-medium ${c.textBody} ${c.hoverMuted} list-none flex items-center gap-1.5 select-none`}>
+                          <ChevronRight className="w-3 h-3 transition-transform group-open/det:rotate-90" />
+                          {storage.on_external ? "Move data back to this computer" : "Move data to an external drive"}
+                        </summary>
+                        <div className={`mt-2 rounded-lg border ${c.border} ${c.bgSub} p-3 text-[11px] leading-relaxed ${c.textBody} space-y-2`}>
+                          <p>
+                            Your data lives in this folder:
+                            <br />
+                            <code className={`font-mono text-[10.5px] ${c.text}`}>{storage.data_dir}</code>
+                          </p>
+                          <ol className={`list-decimal list-inside space-y-1 ${c.textBody}`}>
+                            <li>Close My_GPT.</li>
+                            <li>Move (cut &amp; paste) the folder above to wherever you'd like — e.g. <code className="font-mono text-[10.5px]">E:\MyGPTData</code> on a USB drive.</li>
+                            <li>Open <code className="font-mono text-[10.5px]">data_location.txt</code> in Notepad
+                              ({" "}<span className={`${c.textFaint} font-mono break-all`}>{storage.location_file}</span>{" "})
+                              and put the new folder path on its own line.</li>
+                            <li>Start My_GPT again. Done!</li>
+                          </ol>
+                          <p className={c.textFaint}>
+                            Tip: if the drive isn't plugged in next time you launch, the app will create a fresh empty folder — so always plug in your drive first.
+                          </p>
+                        </div>
+                      </details>
+                    </div>
+                  );
+                })()}
               </section>
 
               {/* Profile */}

@@ -88,6 +88,28 @@ EXPORT_DIR.mkdir(exist_ok=True)
 print(f"[My_GPT] Data folder: {DATA_DIR}")
 
 
+def _dir_size(p: Path) -> int:
+    total = 0
+    try:
+        for entry in p.rglob("*"):
+            try:
+                if entry.is_file():
+                    total += entry.stat().st_size
+            except OSError:
+                pass
+    except OSError:
+        pass
+    return total
+
+
+def _human_bytes(n: int) -> str:
+    for unit in ("B", "KB", "MB", "GB", "TB"):
+        if n < 1024 or unit == "TB":
+            return f"{n:.1f} {unit}" if unit != "B" else f"{n} B"
+        n /= 1024
+    return f"{n:.1f} TB"
+
+
 def db() -> sqlite3.Connection:
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
@@ -745,6 +767,62 @@ def delete_document(doc_id: str):
                 pass
         c.execute("DELETE FROM documents WHERE id = ?", (doc_id,))
     return {"ok": True}
+
+
+# ──────────────────────────────────────────────────────────────────────
+# Storage info — where data lives, how much is used, how much is free
+# ──────────────────────────────────────────────────────────────────────
+class StorageInfo(BaseModel):
+    data_dir: str
+    on_external: bool
+    used_bytes: int
+    used_human: str
+    free_bytes: int
+    free_human: str
+    total_bytes: int
+    total_human: str
+    location_file: str
+    memory_count: int
+    document_count: int
+
+
+@app.get("/storage", response_model=StorageInfo)
+def storage_info():
+    import shutil
+    used = _dir_size(DATA_DIR)
+    try:
+        usage = shutil.disk_usage(str(DATA_DIR))
+        free, total = usage.free, usage.total
+    except OSError:
+        free, total = 0, 0
+
+    # Heuristic for "external": different drive root than the script's drive.
+    on_external = False
+    try:
+        on_external = Path(DATA_DIR).resolve().drive != ROOT.resolve().drive
+        if not on_external:  # *nix fallback: different mount under /Volumes, /media, /mnt
+            s = str(DATA_DIR).lower()
+            on_external = any(s.startswith(p) for p in ("/volumes/", "/media/", "/mnt/"))
+    except Exception:
+        pass
+
+    with db() as c:
+        mem = c.execute("SELECT COUNT(*) AS n FROM memory_items").fetchone()["n"]
+        docs = c.execute("SELECT COUNT(*) AS n FROM documents").fetchone()["n"]
+
+    return StorageInfo(
+        data_dir=str(DATA_DIR),
+        on_external=on_external,
+        used_bytes=used,
+        used_human=_human_bytes(used),
+        free_bytes=free,
+        free_human=_human_bytes(free),
+        total_bytes=total,
+        total_human=_human_bytes(total),
+        location_file=str(LOCATION_FILE),
+        memory_count=mem,
+        document_count=docs,
+    )
 
 
 # ──────────────────────────────────────────────────────────────────────

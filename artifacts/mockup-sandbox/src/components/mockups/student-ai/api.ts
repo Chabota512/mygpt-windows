@@ -117,6 +117,9 @@ export const api = {
   deleteDocument: (id: string) =>
     fetch(`${API_BASE}/documents/${id}`, { method: "DELETE" }).then(j<{ ok: true }>),
 
+  // ── Storage ───────────────────────────────────────────────
+  getStorage: () => fetch(`${API_BASE}/storage`).then(j<ApiStorageInfo>),
+
   // ── Profile ───────────────────────────────────────────────
   getProfile: () => fetch(`${API_BASE}/profile`).then(j<ApiProfile>),
   putProfile: (p: ApiProfile) =>
@@ -128,3 +131,17 @@ export const api = {
 };
 
 export type ApiProfile = { name: string; career: string; avatar: string | null };
+
+export type ApiStorageInfo = {
+  data_dir: string;
+  on_external: boolean;
+  used_bytes: number;
+  used_human: string;
+  free_bytes: number;
+  free_human: string;
+  total_bytes: number;
+  total_human: string;
+  location_file: string;
+  memory_count: number;
+  document_count: number;
+};
