@@ -8,7 +8,7 @@ import {
   ExternalLink, CheckCircle2, Circle, Loader2,
   FlaskConical, TrendingUp, Scale, Stethoscope, BarChart2,
   GripHorizontal, Minimize2, Sun, Moon, ZoomIn, ZoomOut,
-  User as UserIcon, Camera, Trash2
+  User as UserIcon, Camera, Trash2, Pencil, Sparkles, Keyboard, Check
 } from "lucide-react";
 
 type UserProfile = { name: string; career: string; avatar: string | null };
@@ -63,11 +63,30 @@ const CALC_SCHOOLS = [
   { id: "statistics",  label: "Statistics",  short: "Stat",icon: BarChart2,    color: "text-cyan-600",   rows: [["σ","μ","r²","P(x)"],["∑","n!","Cₙᵣ","%"],["(",")",  "CE","÷"],["7","8","9","×"],["4","5","6","−"],["1","2","3","+"],["±","0",".","="]] },
 ];
 
-const SESSIONS = [
-  { label: "PID Control Study", time: "Today" },
-  { label: "Thermodynamics Laws", time: "Yesterday" },
-  { label: "Circuit Analysis", time: "Mon" },
-  { label: "Mechanics of Materials", time: "Last week" },
+type Session = { id: string; label: string; time: string };
+const INITIAL_SESSIONS: Session[] = [
+  { id: "s1", label: "PID Control Study", time: "Today" },
+  { id: "s2", label: "Thermodynamics Laws", time: "Yesterday" },
+  { id: "s3", label: "Circuit Analysis", time: "Mon" },
+  { id: "s4", label: "Mechanics of Materials", time: "Last week" },
+];
+
+const SUGGESTIONS = [
+  { icon: "📘", title: "Explain a concept", subtitle: "Break down a topic step by step" },
+  { icon: "📝", title: "Write a lab report", subtitle: "Drafted from your notes & uploads" },
+  { icon: "🧮", title: "Solve a problem", subtitle: "Show your working with formulas" },
+  { icon: "🎯", title: "Quiz me", subtitle: "Test what you've studied so far" },
+];
+
+const SHORTCUTS: { keys: string; label: string }[] = [
+  { keys: "Ctrl + N", label: "Start a new chat" },
+  { keys: "Ctrl + K", label: "Search your memory" },
+  { keys: "Ctrl + ,", label: "Open settings" },
+  { keys: "Ctrl + +", label: "Increase text & UI size" },
+  { keys: "Ctrl + −", label: "Decrease text & UI size" },
+  { keys: "Ctrl + 0", label: "Reset size to 100%" },
+  { keys: "?",        label: "Show this shortcuts list" },
+  { keys: "Esc",      label: "Close any open dialog" },
 ];
 
 const MEMORY_ITEMS = [
@@ -282,12 +301,100 @@ export function MainApp() {
     reader.readAsDataURL(file);
   };
   const userInitials = getInitials(profile.name);
+
+  /* Sessions (mutable for rename/delete) */
+  const [sessions, setSessions] = useState<Session[]>(INITIAL_SESSIONS);
+  const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
+  const [editingSessionDraft, setEditingSessionDraft] = useState("");
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const startRenameSession = (s: Session) => { setEditingSessionId(s.id); setEditingSessionDraft(s.label); };
+  const commitRenameSession = () => {
+    if (!editingSessionId) return;
+    const next = editingSessionDraft.trim();
+    if (next) setSessions(prev => prev.map(s => s.id === editingSessionId ? { ...s, label: next } : s));
+    setEditingSessionId(null);
+  };
+  const deleteSession = (id: string) => {
+    setSessions(prev => {
+      const filtered = prev.filter(s => s.id !== id);
+      if (activeChat === prev.find(s => s.id === id)?.label && filtered.length > 0) {
+        setActiveChat(filtered[0].label);
+      }
+      return filtered;
+    });
+    setPendingDeleteId(null);
+  };
+  const startNewChat = () => {
+    const id = `s${Date.now()}`;
+    const label = "New Chat";
+    setSessions(prev => [{ id, label, time: "Now" }, ...prev]);
+    setActiveChat(label);
+    setIsEmptyChat(true);
+    setActiveTab("chat");
+    setActiveTool(null);
+  };
+
+  /* Empty / first-run chat & thinking state */
+  const [isEmptyChat, setIsEmptyChat] = useState(false);
+  const [isThinking, setIsThinking] = useState(false);
+  const sendSuggestion = (text: string) => {
+    setIsEmptyChat(false);
+    setInput("");
+    setIsThinking(true);
+    window.setTimeout(() => setIsThinking(false), 2200);
+  };
+
+  /* Settings & shortcuts help */
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
+
+  /* Onboarding banner */
+  const [onboardDismissed, setOnboardDismissed] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return window.localStorage.getItem("student-ai-onboard-dismissed") === "1";
+  });
+  const dismissOnboarding = () => {
+    setOnboardDismissed(true);
+    try { window.localStorage.setItem("student-ai-onboard-dismissed", "1"); } catch {}
+  };
+  const showOnboarding = !onboardDismissed && (profile.name === DEFAULT_PROFILE.name || !profile.career);
+
   const ZOOM_MIN = 0.75;
   const ZOOM_MAX = 1.5;
   const ZOOM_STEP = 0.1;
   const zoomIn = () => setUiScale(s => Math.min(ZOOM_MAX, Math.round((s + ZOOM_STEP) * 100) / 100));
   const zoomOut = () => setUiScale(s => Math.max(ZOOM_MIN, Math.round((s - ZOOM_STEP) * 100) / 100));
   const zoomReset = () => setUiScale(1);
+
+  /* Global keyboard shortcuts */
+  useEffect(() => {
+    const isTypingIn = (el: EventTarget | null) => {
+      if (!(el instanceof HTMLElement)) return false;
+      const tag = el.tagName;
+      return tag === "INPUT" || tag === "TEXTAREA" || el.isContentEditable;
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        if (profileOpen) { setProfileOpen(false); return; }
+        if (settingsOpen) { setSettingsOpen(false); return; }
+        if (shortcutsOpen) { setShortcutsOpen(false); return; }
+        if (pendingDeleteId) { setPendingDeleteId(null); return; }
+        if (editingSessionId) { setEditingSessionId(null); return; }
+      }
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey) {
+        const k = e.key.toLowerCase();
+        if (k === "n") { e.preventDefault(); startNewChat(); return; }
+        if (k === "k") { e.preventDefault(); setActiveTab("memory"); return; }
+        if (k === ",") { e.preventDefault(); setSettingsOpen(true); return; }
+        if (k === "=" || k === "+") { e.preventDefault(); zoomIn(); return; }
+        if (k === "-" || k === "_") { e.preventDefault(); zoomOut(); return; }
+        if (k === "0") { e.preventDefault(); zoomReset(); return; }
+      }
+      if (e.key === "?" && !isTypingIn(e.target)) { e.preventDefault(); setShortcutsOpen(o => !o); }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [profileOpen, settingsOpen, shortcutsOpen, pendingDeleteId, editingSessionId]);
   const dragRef  = useRef<{ ox: number; oy: number; px: number; py: number } | null>(null);
   const resizeRef = useRef<{ ox: number; oy: number; w: number; h: number } | null>(null);
 
@@ -337,7 +444,7 @@ export function MainApp() {
   const school = CALC_SCHOOLS.find(s => s.id === calcSchool) ?? CALC_SCHOOLS[0];
 
   return (
-    <div className={`relative flex h-screen font-sans overflow-hidden transition-colors duration-300 ${c.root}`} style={{ zoom: uiScale }}>
+    <div className={`student-ai-root relative flex h-screen font-sans overflow-hidden transition-colors duration-300 ${c.root}`} style={{ zoom: uiScale }}>
 
       {/* ══ LEFT SIDEBAR ══ */}
       <aside className={`flex-shrink-0 ${c.sidebar} border-r ${c.border} flex flex-col transition-all duration-300 ease-in-out overflow-hidden ${sidebarOpen ? "w-64" : "w-12"}`}>
@@ -362,7 +469,11 @@ export function MainApp() {
             </div>
 
             <div className="px-4 py-3">
-              <button className="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 transition-colors text-sm font-medium text-white shadow-md shadow-indigo-500/20">
+              <button
+                onClick={startNewChat}
+                title="Start a new chat (Ctrl + N)"
+                className="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 transition-colors text-sm font-medium text-white shadow-md shadow-indigo-500/20"
+              >
                 <Plus className="w-4 h-4" />New Chat
               </button>
             </div>
@@ -370,14 +481,78 @@ export function MainApp() {
             <div className="flex-1 overflow-y-auto px-3 pb-4">
               <p className={`text-[10px] uppercase tracking-widest font-semibold px-2 mb-2 ${c.textFaint}`}>Chats</p>
               <div className="space-y-0.5">
-                {SESSIONS.map(s => (
-                  <button key={s.label} onClick={() => selectChat(s.label)}
-                    className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left transition-all ${activeChat === s.label ? c.chatActive : c.chatInactive}`}>
-                    <MessageSquare className={`w-3.5 h-3.5 flex-shrink-0 ${activeChat === s.label ? "text-indigo-500" : ""}`} />
-                    <span className="text-xs flex-1 truncate font-medium">{s.label}</span>
-                    <span className={`text-[10px] ${c.textXs}`}>{s.time}</span>
-                  </button>
-                ))}
+                {sessions.map(s => {
+                  const isActive = activeChat === s.label;
+                  const isEditing = editingSessionId === s.id;
+                  const isDeleting = pendingDeleteId === s.id;
+                  return (
+                    <div key={s.id}
+                      className={`group relative flex items-center gap-2 px-3 py-2 rounded-lg transition-all ${isActive ? c.chatActive : c.chatInactive}`}>
+                      <MessageSquare className={`w-3.5 h-3.5 flex-shrink-0 ${isActive ? "text-indigo-500" : ""}`} />
+                      {isEditing ? (
+                        <input
+                          autoFocus
+                          value={editingSessionDraft}
+                          onChange={e => setEditingSessionDraft(e.target.value)}
+                          onBlur={commitRenameSession}
+                          onKeyDown={e => {
+                            if (e.key === "Enter") commitRenameSession();
+                            if (e.key === "Escape") setEditingSessionId(null);
+                          }}
+                          className={`flex-1 bg-transparent outline-none text-xs font-medium ${c.text} border-b ${c.borderBrt}`}
+                          aria-label="Rename chat"
+                        />
+                      ) : (
+                        <button
+                          onClick={() => selectChat(s.label)}
+                          className="flex-1 flex items-center gap-2 text-left min-w-0"
+                          title={s.label}
+                        >
+                          <span className="text-xs flex-1 truncate font-medium">{s.label}</span>
+                          <span className={`text-[10px] ${c.textXs} group-hover:opacity-0 transition-opacity`}>{s.time}</span>
+                        </button>
+                      )}
+                      {!isEditing && (
+                        <div className="absolute right-2 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button
+                            onClick={(e) => { e.stopPropagation(); startRenameSession(s); }}
+                            className={`w-6 h-6 flex items-center justify-center rounded-md ${c.textMuted} ${c.hoverMed}`}
+                            title="Rename chat"
+                            aria-label={`Rename ${s.label}`}
+                          >
+                            <Pencil className="w-3 h-3" />
+                          </button>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setPendingDeleteId(s.id); }}
+                            className={`w-6 h-6 flex items-center justify-center rounded-md ${c.textMuted} hover:bg-rose-500/15 hover:text-rose-400`}
+                            title="Delete chat"
+                            aria-label={`Delete ${s.label}`}
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        </div>
+                      )}
+                      {isDeleting && (
+                        <div className={`absolute left-0 right-0 top-full mt-1 z-10 rounded-lg border ${c.borderMd} ${c.card} p-2.5 shadow-xl`}>
+                          <p className={`text-[11px] mb-2 ${c.textBody}`}>Delete this chat? This can't be undone.</p>
+                          <div className="flex items-center justify-end gap-1.5">
+                            <button
+                              onClick={() => setPendingDeleteId(null)}
+                              className={`px-2 py-1 rounded-md text-[11px] ${c.textMuted} ${c.hoverMuted}`}
+                            >Cancel</button>
+                            <button
+                              onClick={() => deleteSession(s.id)}
+                              className="px-2 py-1 rounded-md text-[11px] font-medium bg-rose-500 hover:bg-rose-400 text-white"
+                            >Delete</button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+                {sessions.length === 0 && (
+                  <p className={`text-[11px] px-3 py-4 text-center ${c.textFaint}`}>No chats yet — tap <span className="font-medium">New Chat</span> to start one.</p>
+                )}
               </div>
 
               <p className={`text-[10px] uppercase tracking-widest font-semibold px-2 mt-5 mb-2 ${c.textFaint}`}>Memory</p>
@@ -421,8 +596,8 @@ export function MainApp() {
             </div>
             <div className={`w-6 h-px ${c.dot} rounded`} />
             <div className="flex flex-col items-center gap-2">
-              {SESSIONS.slice(0, 3).map(s => (
-                <div key={s.label} className={`w-7 h-7 flex items-center justify-center rounded-lg ${c.textGhost} transition-colors`} title={s.label}>
+              {sessions.slice(0, 3).map(s => (
+                <div key={s.id} className={`w-7 h-7 flex items-center justify-center rounded-lg ${c.textGhost} transition-colors`} title={s.label}>
                   <MessageSquare className="w-3.5 h-3.5" />
                 </div>
               ))}
@@ -458,7 +633,7 @@ export function MainApp() {
                 onClick={zoomOut}
                 disabled={uiScale <= ZOOM_MIN + 0.001}
                 className={`w-7 h-7 flex items-center justify-center rounded-md ${c.textMuted} ${c.hoverMuted} transition-colors disabled:opacity-30 disabled:cursor-not-allowed`}
-                title="Decrease size"
+                title="Decrease size (Ctrl + −)"
                 aria-label="Decrease text and element size"
               >
                 <ZoomOut className="w-3.5 h-3.5" />
@@ -466,7 +641,7 @@ export function MainApp() {
               <button
                 onClick={zoomReset}
                 className={`min-w-[40px] h-7 px-1.5 flex items-center justify-center rounded-md text-[11px] font-medium tabular-nums ${c.textMuted} ${c.hoverMuted} transition-colors`}
-                title="Reset to 100%"
+                title="Reset to 100% (Ctrl + 0)"
                 aria-label="Reset text and element size to 100%"
               >
                 {Math.round(uiScale * 100)}%
@@ -475,7 +650,7 @@ export function MainApp() {
                 onClick={zoomIn}
                 disabled={uiScale >= ZOOM_MAX - 0.001}
                 className={`w-7 h-7 flex items-center justify-center rounded-md ${c.textMuted} ${c.hoverMuted} transition-colors disabled:opacity-30 disabled:cursor-not-allowed`}
-                title="Increase size"
+                title="Increase size (Ctrl + +)"
                 aria-label="Increase text and element size"
               >
                 <ZoomIn className="w-3.5 h-3.5" />
@@ -485,12 +660,28 @@ export function MainApp() {
             <button
               onClick={() => setDarkMode(d => !d)}
               className={`w-8 h-8 flex items-center justify-center rounded-lg ${c.bgMuted} border ${c.border} ${c.textMuted} ${c.hoverMuted} transition-colors`}
-              title={darkMode ? "Switch to light mode" : "Switch to dark mode"}
+              title={darkMode ? "Switch to light theme" : "Switch to dark theme"}
+              aria-label={darkMode ? "Switch to light theme" : "Switch to dark theme"}
             >
               {darkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
             </button>
-            <button className={`w-8 h-8 flex items-center justify-center rounded-lg ${c.bgMuted} ${c.hoverMed} ${c.textMuted} transition-colors`}>
-              <MoreHorizontal className="w-4 h-4" />
+            {/* Keyboard shortcuts */}
+            <button
+              onClick={() => setShortcutsOpen(true)}
+              className={`w-8 h-8 flex items-center justify-center rounded-lg ${c.bgMuted} border ${c.border} ${c.textMuted} ${c.hoverMuted} transition-colors`}
+              title="Keyboard shortcuts (?)"
+              aria-label="Show keyboard shortcuts"
+            >
+              <Keyboard className="w-4 h-4" />
+            </button>
+            {/* Settings */}
+            <button
+              onClick={() => setSettingsOpen(true)}
+              className={`w-8 h-8 flex items-center justify-center rounded-lg ${c.bgMuted} border ${c.border} ${c.textMuted} ${c.hoverMuted} transition-colors`}
+              title="Settings (Ctrl + ,)"
+              aria-label="Open settings"
+            >
+              <Settings className="w-4 h-4" />
             </button>
             {/* User profile button */}
             <button
@@ -585,6 +776,66 @@ export function MainApp() {
         ) : (
           /* ── CHAT VIEW ── */
           <div className="flex-1 overflow-y-auto px-6 py-6 space-y-6">
+            {/* Onboarding nudge */}
+            {showOnboarding && (
+              <div className={`flex items-center gap-3 px-4 py-3 rounded-xl border ${c.memBannerBg}`} role="region" aria-label="Profile setup">
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center flex-shrink-0">
+                  <Sparkles className="w-4 h-4 text-white" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className={`text-xs font-semibold ${c.text}`}>Make this yours</p>
+                  <p className={`text-[11px] mt-0.5 ${c.memBannerText}`}>Add your name and field of study so explanations match your subject.</p>
+                </div>
+                <button
+                  onClick={openProfile}
+                  className="px-3 py-1.5 rounded-lg text-[11px] font-medium bg-indigo-600 hover:bg-indigo-500 text-white transition-colors flex-shrink-0"
+                >Set up profile</button>
+                <button
+                  onClick={dismissOnboarding}
+                  className={`w-7 h-7 flex items-center justify-center rounded-lg ${c.textMuted} ${c.hoverMuted} flex-shrink-0`}
+                  title="Dismiss"
+                  aria-label="Dismiss onboarding"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
+
+            {isEmptyChat ? (
+              /* ── WELCOME / FIRST-RUN SCREEN ── */
+              <div className="flex flex-col items-center justify-center text-center py-16 px-4">
+                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center shadow-lg shadow-indigo-500/30 mb-5">
+                  <GraduationCap className="w-8 h-8 text-white" />
+                </div>
+                <h2 className={`text-xl font-semibold ${c.text}`}>
+                  Hi {profile.name === DEFAULT_PROFILE.name ? "there" : profile.name.split(/\s+/)[0]} — what are we studying today?
+                </h2>
+                <p className={`text-sm mt-2 max-w-md ${c.textBody}`}>
+                  Ask anything, drop in your notes, or pick a quick start below. Everything runs locally on your machine.
+                </p>
+                <div className="grid grid-cols-2 gap-3 mt-8 w-full max-w-2xl">
+                  {SUGGESTIONS.map(s => (
+                    <button
+                      key={s.title}
+                      onClick={() => sendSuggestion(s.title)}
+                      className={`text-left p-4 rounded-xl border ${c.border} ${c.card} hover:border-indigo-500/40 hover:shadow-md transition-all`}
+                    >
+                      <div className="flex items-start gap-3">
+                        <span className="text-2xl leading-none mt-0.5" aria-hidden="true">{s.icon}</span>
+                        <div className="min-w-0">
+                          <p className={`text-sm font-medium ${c.text}`}>{s.title}</p>
+                          <p className={`text-[11px] mt-0.5 ${c.textFaint}`}>{s.subtitle}</p>
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+                <p className={`text-[11px] mt-6 ${c.textFaint}`}>
+                  Tip: press <kbd className={`px-1.5 py-0.5 rounded border ${c.border} ${c.bgMuted} font-mono text-[10px] ${c.textMd}`}>?</kbd> to see all keyboard shortcuts.
+                </p>
+              </div>
+            ) : (
+            <>
             {/* Memory banner */}
             <div className={`flex items-center gap-2.5 px-4 py-2.5 rounded-xl ${c.memBannerBg} border`}>
               <Layers className="w-3.5 h-3.5 text-indigo-500 flex-shrink-0" />
@@ -627,7 +878,7 @@ export function MainApp() {
             ))}
 
             {/* Document generation card */}
-            {activeTool === "Write Doc" ? (
+            {activeTool === "Write Doc" && (
               <div className="flex gap-3 justify-start">
                 <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center flex-shrink-0 mt-0.5 shadow-md shadow-indigo-500/20">
                   <GraduationCap className="w-3.5 h-3.5 text-white" />
@@ -688,9 +939,11 @@ export function MainApp() {
                   </div>
                 </div>
               </div>
-            ) : (
-              /* Typing indicator */
-              <div className="flex gap-3 justify-start">
+            )}
+
+            {/* Typing indicator (assistant is thinking) */}
+            {isThinking && (
+              <div className="flex gap-3 justify-start" role="status" aria-live="polite" aria-label="Assistant is thinking">
                 <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center flex-shrink-0 shadow-md shadow-indigo-500/20">
                   <GraduationCap className="w-3.5 h-3.5 text-white" />
                 </div>
@@ -702,6 +955,8 @@ export function MainApp() {
                   </div>
                 </div>
               </div>
+            )}
+            </>
             )}
           </div>
         )}
@@ -938,6 +1193,165 @@ export function MainApp() {
               <path d="M8 0 L8 8 L0 8" stroke="currentColor" strokeWidth="1.5" fill="none" />
               <path d="M8 4 L8 8 L4 8" stroke="currentColor" strokeWidth="1.5" fill="none" />
             </svg>
+          </div>
+        </div>
+      )}
+
+      {/* ══ A11Y FOCUS RING ══ */}
+      <style>{`
+        .student-ai-root :focus-visible {
+          outline: 2px solid #818cf8;
+          outline-offset: 2px;
+          border-radius: 6px;
+        }
+      `}</style>
+
+      {/* ══ SETTINGS MODAL ══ */}
+      {settingsOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+          onClick={() => setSettingsOpen(false)}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Settings"
+        >
+          <div
+            className={`w-full max-w-lg rounded-2xl border ${c.borderMd} ${c.card} shadow-2xl overflow-hidden`}
+            onClick={e => e.stopPropagation()}
+          >
+            <div className={`flex items-center justify-between px-5 py-4 border-b ${c.border}`}>
+              <div className="flex items-center gap-2">
+                <Settings className={`w-4 h-4 ${c.textMd}`} />
+                <h2 className={`text-sm font-semibold ${c.text}`}>Settings</h2>
+              </div>
+              <button onClick={() => setSettingsOpen(false)} className={`w-7 h-7 flex items-center justify-center rounded-lg ${c.textMuted} ${c.hoverMuted}`} aria-label="Close settings">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="px-5 py-5 space-y-5 max-h-[70vh] overflow-y-auto">
+              {/* Appearance */}
+              <section>
+                <h3 className={`text-[11px] uppercase tracking-widest font-semibold mb-3 ${c.textFaint}`}>Appearance</h3>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className={`text-xs font-medium ${c.text}`}>Theme</p>
+                      <p className={`text-[11px] mt-0.5 ${c.textFaint}`}>Switch between light and dark.</p>
+                    </div>
+                    <div className={`flex items-center rounded-lg border ${c.border} ${c.bgMuted} p-0.5`}>
+                      <button
+                        onClick={() => setDarkMode(false)}
+                        className={`px-3 py-1.5 rounded-md text-[11px] font-medium flex items-center gap-1.5 ${!darkMode ? "bg-indigo-600 text-white" : `${c.textMuted} ${c.hoverMuted}`}`}
+                      ><Sun className="w-3 h-3" />Light</button>
+                      <button
+                        onClick={() => setDarkMode(true)}
+                        className={`px-3 py-1.5 rounded-md text-[11px] font-medium flex items-center gap-1.5 ${darkMode ? "bg-indigo-600 text-white" : `${c.textMuted} ${c.hoverMuted}`}`}
+                      ><Moon className="w-3 h-3" />Dark</button>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className={`text-xs font-medium ${c.text}`}>Text & UI size</p>
+                      <p className={`text-[11px] mt-0.5 ${c.textFaint}`}>Make everything bigger or smaller.</p>
+                    </div>
+                    <div className={`flex items-center gap-0.5 rounded-lg ${c.bgMuted} border ${c.border} p-0.5`}>
+                      <button onClick={zoomOut} disabled={uiScale <= ZOOM_MIN + 0.001} className={`w-7 h-7 flex items-center justify-center rounded-md ${c.textMuted} ${c.hoverMuted} disabled:opacity-30`} aria-label="Decrease size"><ZoomOut className="w-3.5 h-3.5" /></button>
+                      <button onClick={zoomReset} className={`min-w-[44px] h-7 px-2 text-[11px] font-medium tabular-nums ${c.textMuted} ${c.hoverMuted} rounded-md`}>{Math.round(uiScale * 100)}%</button>
+                      <button onClick={zoomIn} disabled={uiScale >= ZOOM_MAX - 0.001} className={`w-7 h-7 flex items-center justify-center rounded-md ${c.textMuted} ${c.hoverMuted} disabled:opacity-30`} aria-label="Increase size"><ZoomIn className="w-3.5 h-3.5" /></button>
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              {/* AI model */}
+              <section>
+                <h3 className={`text-[11px] uppercase tracking-widest font-semibold mb-3 ${c.textFaint}`}>Local AI model</h3>
+                <div className={`rounded-xl border ${c.border} ${c.bgMuted} p-3 flex items-center gap-3`}>
+                  <div className="w-9 h-9 rounded-lg bg-emerald-500/15 flex items-center justify-center">
+                    <Sparkles className="w-4 h-4 text-emerald-500" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className={`text-xs font-medium ${c.text}`}>Llama 3.1 · 8B Q4</p>
+                    <p className={`text-[11px] mt-0.5 ${c.textFaint}`}>3.2 GB / 5.1 GB VRAM · Running locally</p>
+                  </div>
+                  <button className={`px-3 py-1.5 rounded-lg text-[11px] font-medium border ${c.border} ${c.textBody} ${c.hoverMuted}`}>Change</button>
+                </div>
+              </section>
+
+              {/* Profile */}
+              <section>
+                <h3 className={`text-[11px] uppercase tracking-widest font-semibold mb-3 ${c.textFaint}`}>Profile</h3>
+                <div className={`rounded-xl border ${c.border} ${c.bgMuted} p-3 flex items-center gap-3`}>
+                  {profile.avatar ? (
+                    <img src={profile.avatar} alt="" className="w-10 h-10 rounded-lg object-cover" />
+                  ) : (
+                    <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 text-white text-xs font-semibold flex items-center justify-center">{userInitials}</div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className={`text-xs font-medium truncate ${c.text}`}>{profile.name}</p>
+                    <p className={`text-[11px] mt-0.5 truncate ${c.textFaint}`}>{profile.career || "No field of study set"}</p>
+                  </div>
+                  <button onClick={() => { setSettingsOpen(false); openProfile(); }} className={`px-3 py-1.5 rounded-lg text-[11px] font-medium border ${c.border} ${c.textBody} ${c.hoverMuted}`}>Edit</button>
+                </div>
+              </section>
+
+              {/* Shortcuts shortcut */}
+              <section>
+                <button
+                  onClick={() => { setSettingsOpen(false); setShortcutsOpen(true); }}
+                  className={`w-full flex items-center gap-3 rounded-xl border ${c.border} ${c.bgMuted} p-3 text-left ${c.hoverMuted}`}
+                >
+                  <div className="w-9 h-9 rounded-lg bg-indigo-500/15 flex items-center justify-center">
+                    <Keyboard className="w-4 h-4 text-indigo-500" />
+                  </div>
+                  <div className="flex-1">
+                    <p className={`text-xs font-medium ${c.text}`}>Keyboard shortcuts</p>
+                    <p className={`text-[11px] mt-0.5 ${c.textFaint}`}>See every shortcut in one place.</p>
+                  </div>
+                  <ChevronRight className={`w-4 h-4 ${c.textFaint}`} />
+                </button>
+              </section>
+            </div>
+
+            <div className={`flex items-center justify-end gap-2 px-5 py-3 border-t ${c.border} ${c.bgSub}`}>
+              <button onClick={() => setSettingsOpen(false)} className="px-4 py-1.5 rounded-lg text-xs font-medium bg-indigo-600 hover:bg-indigo-500 text-white">Done</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ══ SHORTCUTS MODAL ══ */}
+      {shortcutsOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+          onClick={() => setShortcutsOpen(false)}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Keyboard shortcuts"
+        >
+          <div className={`w-full max-w-md rounded-2xl border ${c.borderMd} ${c.card} shadow-2xl overflow-hidden`} onClick={e => e.stopPropagation()}>
+            <div className={`flex items-center justify-between px-5 py-4 border-b ${c.border}`}>
+              <div className="flex items-center gap-2">
+                <Keyboard className={`w-4 h-4 ${c.textMd}`} />
+                <h2 className={`text-sm font-semibold ${c.text}`}>Keyboard shortcuts</h2>
+              </div>
+              <button onClick={() => setShortcutsOpen(false)} className={`w-7 h-7 flex items-center justify-center rounded-lg ${c.textMuted} ${c.hoverMuted}`} aria-label="Close shortcuts">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="px-5 py-4">
+              <ul className="space-y-2">
+                {SHORTCUTS.map(s => (
+                  <li key={s.keys} className="flex items-center justify-between gap-3">
+                    <span className={`text-xs ${c.textBody}`}>{s.label}</span>
+                    <kbd className={`px-2 py-1 rounded-md border ${c.border} ${c.bgMuted} font-mono text-[11px] ${c.textMd}`}>{s.keys}</kbd>
+                  </li>
+                ))}
+              </ul>
+              <p className={`text-[11px] mt-4 ${c.textFaint}`}>On macOS, use ⌘ instead of Ctrl.</p>
+            </div>
           </div>
         </div>
       )}
