@@ -63,17 +63,17 @@ const MEMORY_ITEMS = [
 /* ─────────────── Theme palette ─────────────── */
 function makeTheme(dark: boolean) {
   if (dark) return {
-    root:         "bg-[#0f1117] text-white",
-    sidebar:      "bg-[#13151f]",
-    panel:        "bg-[#13151f]",
-    card:         "bg-[#1a1d2e]",
-    inputWrap:    "bg-[#1a1d2e]",
-    calcBg:       "bg-[#13151f]",
-    calcHeader:   "bg-[#1a1d2e]",
-    calcDisplay:  "bg-[#0f1117]",
-    headerBg:     "bg-[#0f1117]",
-    tabBg:        "bg-[#0f1117]",
-    inputAreaBg:  "bg-[#0f1117]",
+    root:         "bg-[#181310] text-white",
+    sidebar:      "bg-[#221b14]",
+    panel:        "bg-[#221b14]",
+    card:         "bg-[#2b2218]",
+    inputWrap:    "bg-[#2b2218]",
+    calcBg:       "bg-[#221b14]",
+    calcHeader:   "bg-[#2b2218]",
+    calcDisplay:  "bg-[#181310]",
+    headerBg:     "bg-[#181310]",
+    tabBg:        "bg-[#181310]",
+    inputAreaBg:  "bg-[#181310]",
 
     border:    "border-white/[0.06]",
     borderMd:  "border-white/[0.08]",
@@ -100,36 +100,54 @@ function makeTheme(dark: boolean) {
     hoverMed:    "hover:bg-white/[0.08]",
 
     chatInactive:    "text-white/50 hover:text-white/80 hover:bg-white/[0.04]",
-    chatActive:      "bg-indigo-600/20 text-white border border-indigo-500/20",
-    memBannerBg:     "bg-indigo-500/[0.08] border-indigo-500/15",
-    memBannerText:   "text-indigo-300/80",
-    memBannerStrong: "text-indigo-300",
-    memBannerArrow:  "text-indigo-400/50",
-    userMsg:         "bg-indigo-600 text-white rounded-tr-sm",
-    assistMsg:       "bg-[#1a1d2e] text-white/85 border border-white/[0.06] rounded-tl-sm",
-    tabActive:       "border-indigo-500 text-white",
+    chatActive:      "bg-emerald-600/15 text-white border border-emerald-500/25",
+    memBannerBg:     "bg-emerald-500/[0.07] border-emerald-500/20",
+    memBannerText:   "text-emerald-300/80",
+    memBannerStrong: "text-emerald-300",
+    memBannerArrow:  "text-emerald-400/50",
+    userMsg:         "bg-emerald-700 text-white rounded-tr-sm",
+    assistMsg:       "bg-[#2b2218] text-white/85 border border-white/[0.06] rounded-tl-sm",
+    tabActive:       "border-emerald-500 text-white",
     tabInactive:     "border-transparent text-white/40 hover:text-white/60",
     vramTrack:       "bg-white/[0.06]",
     searchResult:    "border-white/[0.06] hover:border-white/[0.12] bg-white/[0.015] hover:bg-white/[0.03]",
-    searchBreadcrumb:"text-emerald-500/70",
-    searchInput:     "bg-[#1a1d2e] border-white/[0.1]",
+    searchBreadcrumb:"text-emerald-400/70",
+    searchInput:     "bg-[#2b2218] border-white/[0.1]",
     searchTipBg:     "bg-amber-500/[0.06] border-amber-500/15",
     searchTipText:   "text-amber-300/60",
     searchTipStrong: "text-amber-300/80",
-    docCard:         "border-indigo-500/25 bg-[#1a1d2e]",
-    docHeader:       "bg-indigo-500/[0.07] border-b border-indigo-500/15",
-    docPreview:      "bg-[#0f1117] border-white/[0.05]",
+    docCard:         "border-emerald-500/25 bg-[#2b2218]",
+    docHeader:       "bg-emerald-500/[0.07] border-b border-emerald-500/15",
+    docPreview:      "bg-[#181310] border-white/[0.05]",
     docPreviewLabel: "text-white/30",
     docPreviewText:  "text-white/55",
-    inputFocus:      "focus-within:border-indigo-500/40",
+    inputFocus:      "focus-within:border-emerald-500/40",
     gripColor:       "text-white/20",
     resizeColor:     "text-white/20",
-    keyEq:  "bg-indigo-600 hover:bg-indigo-500 text-white",
-    keyOp:  "bg-white/[0.08] hover:bg-white/[0.14] text-indigo-300",
+    keyEq:  "bg-emerald-700 hover:bg-emerald-600 text-white",
+    keyOp:  "bg-white/[0.08] hover:bg-white/[0.14] text-emerald-300",
     keySp:  "bg-white/[0.06] hover:bg-white/[0.1] text-white/60",
     keyFn:  "bg-white/[0.04] hover:bg-white/[0.08] text-white/50",
     keyNum: "bg-white/[0.04] hover:bg-white/[0.1] text-white/80",
     dot:    "bg-white/[0.08]",
+
+    accGrad:      "from-emerald-500 to-teal-700",
+    accBg:        "bg-emerald-700",
+    accBgHover:   "hover:bg-emerald-600",
+    accShadow:    "shadow-emerald-600/25",
+    accText:      "text-emerald-400",
+    accTextSoft:  "text-emerald-300",
+    accIcon:      "text-emerald-400",
+    accDot:       "bg-emerald-400",
+    accBgSolid:   "bg-emerald-500",
+    accProgGrad:  "from-emerald-500 to-teal-500",
+    accBarFill:   "bg-emerald-500/70",
+    accIconBg:    "bg-emerald-500/15",
+    accIconText:  "text-emerald-300",
+    accLink:      "text-emerald-400 hover:text-emerald-300",
+    toolBadgeWrite:  "bg-emerald-500/10 border-emerald-500/30 text-emerald-300",
+    toolBadgeCalc:   "bg-violet-500/10 border-violet-500/30 text-violet-300",
+    toolBadgeSearch: "bg-amber-500/10 border-amber-500/30 text-amber-300",
   } as const;
 
   /* ── LIGHT MODE — warm cream palette ── */
@@ -198,6 +216,24 @@ function makeTheme(dark: boolean) {
     keyEq:  "bg-indigo-600 hover:bg-indigo-500 text-white",
     keyOp:  "bg-[#e8e1d8] hover:bg-[#ddd4c4] text-indigo-700",
     keySp:  "bg-[#ede8df] hover:bg-[#e5ddd0] text-[#6e6256]",
+
+    accGrad:      "from-indigo-500 to-violet-600",
+    accBg:        "bg-indigo-600",
+    accBgHover:   "hover:bg-indigo-500",
+    accShadow:    "shadow-indigo-500/20",
+    accText:      "text-indigo-700",
+    accTextSoft:  "text-indigo-600",
+    accIcon:      "text-indigo-500",
+    accDot:       "bg-indigo-400",
+    accBgSolid:   "bg-indigo-500",
+    accProgGrad:  "from-indigo-500 to-violet-500",
+    accBarFill:   "bg-indigo-500/70",
+    accIconBg:    "bg-indigo-100",
+    accIconText:  "text-indigo-600",
+    accLink:      "text-indigo-600 hover:text-indigo-500",
+    toolBadgeWrite:  "bg-indigo-50 border-indigo-200 text-indigo-700",
+    toolBadgeCalc:   "bg-emerald-50 border-emerald-200 text-emerald-700",
+    toolBadgeSearch: "bg-amber-50 border-amber-200 text-amber-700",
     keyFn:  "bg-[#f4f0e8] hover:bg-[#ede8df] text-[#8c7d70]",
     keyNum: "bg-[#f4f0e8] hover:bg-[#e8e1d8] text-[#2c2418]",
     dot:    "bg-[#ddd4c4]",
@@ -282,7 +318,7 @@ export function MainApp() {
           <>
             <div className={`px-4 py-4 border-b ${c.border} flex items-center justify-between`}>
               <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center shadow-lg shadow-indigo-500/20 flex-shrink-0">
+                <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${c.accGrad} flex items-center justify-center shadow-lg ${c.accShadow} flex-shrink-0`}>
                   <GraduationCap className="w-4 h-4 text-white" />
                 </div>
                 <div>
@@ -299,7 +335,7 @@ export function MainApp() {
             </div>
 
             <div className="px-4 py-3">
-              <button className="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 transition-colors text-sm font-medium text-white shadow-md shadow-indigo-500/20">
+              <button className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg ${c.accBg} ${c.accBgHover} transition-colors text-sm font-medium text-white shadow-md ${c.accShadow}`}>
                 <Plus className="w-4 h-4" />New Chat
               </button>
             </div>
@@ -310,7 +346,7 @@ export function MainApp() {
                 {SESSIONS.map(s => (
                   <button key={s.label} onClick={() => selectChat(s.label)}
                     className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left transition-all ${activeChat === s.label ? c.chatActive : c.chatInactive}`}>
-                    <MessageSquare className={`w-3.5 h-3.5 flex-shrink-0 ${activeChat === s.label ? "text-indigo-500" : ""}`} />
+                    <MessageSquare className={`w-3.5 h-3.5 flex-shrink-0 ${activeChat === s.label ? c.accIcon : ""}`} />
                     <span className="text-xs flex-1 truncate font-medium">{s.label}</span>
                     <span className={`text-[10px] ${c.textXs}`}>{s.time}</span>
                   </button>
@@ -338,7 +374,7 @@ export function MainApp() {
                 <WifiOff className={`w-3 h-3 ${c.textGhost}`} />
               </div>
               <div className={`w-full ${c.vramTrack} rounded-full h-1`}>
-                <div className="bg-indigo-500/70 h-1 rounded-full" style={{ width: "62%" }} />
+                <div className={`${c.accBarFill} h-1 rounded-full`} style={{ width: "62%" }} />
               </div>
               <p className={`text-[10px] mt-1 ${c.textXs}`}>3.2 GB / 5.1 GB VRAM</p>
             </div>
@@ -353,7 +389,7 @@ export function MainApp() {
               <PanelLeftOpen className="w-4 h-4" />
             </button>
             <div className={`w-6 h-px ${c.dot} rounded`} />
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center shadow-md shadow-indigo-500/20">
+            <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${c.accGrad} flex items-center justify-center shadow-md ${c.accShadow}`}>
               <GraduationCap className="w-3.5 h-3.5 text-white" />
             </div>
             <div className={`w-6 h-px ${c.dot} rounded`} />
@@ -446,7 +482,7 @@ export function MainApp() {
                         : <FileText className={`w-4 h-4 ${r.type === "pdf" ? "text-rose-500" : "text-blue-500"}`} />}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <button className="text-left text-indigo-600 hover:text-indigo-500 hover:underline text-sm font-medium leading-snug transition-colors">{r.title}</button>
+                      <button className={`text-left ${c.accLink} hover:underline text-sm font-medium leading-snug transition-colors`}>{r.title}</button>
                       <p className={`text-[10px] mt-0.5 font-mono ${c.searchBreadcrumb}`}>{r.path}</p>
                     </div>
                     <div className={`flex-shrink-0 flex items-center gap-1.5 px-2 py-0.5 rounded-full ${c.bgMuted} border ${c.border}`}>
@@ -459,7 +495,7 @@ export function MainApp() {
                   <div className="flex items-center gap-2 ml-11">
                     <span className={`text-[10px] ${c.textXs}`}>{r.meta}</span>
                     <div className={`w-px h-3 ${c.bgBrt} rounded`} />
-                    <button className="flex items-center gap-1 text-[11px] text-indigo-600 hover:text-indigo-500 font-medium transition-colors">
+                    <button className={`flex items-center gap-1 text-[11px] ${c.accLink} font-medium transition-colors`}>
                       <ExternalLink className="w-3 h-3" />Open file
                     </button>
                     <button className={`text-[11px] font-medium transition-colors ${c.textFaint} ${c.hoverMuted}`}>Reference in chat</button>
@@ -479,7 +515,7 @@ export function MainApp() {
           <div className="flex-1 overflow-y-auto px-6 py-6 space-y-6">
             {/* Memory banner */}
             <div className={`flex items-center gap-2.5 px-4 py-2.5 rounded-xl ${c.memBannerBg} border`}>
-              <Layers className="w-3.5 h-3.5 text-indigo-500 flex-shrink-0" />
+              <Layers className={`w-3.5 h-3.5 ${c.accIcon} flex-shrink-0`} />
               <p className={`text-xs ${c.memBannerText}`}>
                 <span className={`font-semibold ${c.memBannerStrong}`}>2 memory items</span> loaded — PID Notes (Nov 12) and Lab Diagram (Nov 10)
               </p>
@@ -490,7 +526,7 @@ export function MainApp() {
             {DEMO_MESSAGES.map(msg => (
               <div key={msg.id} className={`flex gap-3 ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
                 {msg.role === "assistant" && (
-                  <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center flex-shrink-0 mt-0.5 shadow-md shadow-indigo-500/20">
+                  <div className={`w-7 h-7 rounded-lg bg-gradient-to-br ${c.accGrad} flex items-center justify-center flex-shrink-0 mt-0.5 shadow-md ${c.accShadow}`}>
                     <GraduationCap className="w-3.5 h-3.5 text-white" />
                   </div>
                 )}
@@ -512,7 +548,7 @@ export function MainApp() {
             {/* Document generation card */}
             {activeTool === "Write Doc" ? (
               <div className="flex gap-3 justify-start">
-                <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center flex-shrink-0 mt-0.5 shadow-md shadow-indigo-500/20">
+                <div className={`w-7 h-7 rounded-lg bg-gradient-to-br ${c.accGrad} flex items-center justify-center flex-shrink-0 mt-0.5 shadow-md ${c.accShadow}`}>
                   <GraduationCap className="w-3.5 h-3.5 text-white" />
                 </div>
                 <div className="flex-1 max-w-[85%]">
@@ -521,34 +557,34 @@ export function MainApp() {
                   </div>
                   <div className={`rounded-2xl border ${c.docCard} overflow-hidden`}>
                     <div className={`px-4 py-3 ${c.docHeader} flex items-center gap-3`}>
-                      <div className="w-9 h-9 rounded-xl bg-indigo-100 flex items-center justify-center flex-shrink-0">
-                        <FileText className="w-4 h-4 text-indigo-600" />
+                      <div className={`w-9 h-9 rounded-xl ${c.accIconBg} flex items-center justify-center flex-shrink-0`}>
+                        <FileText className={`w-4 h-4 ${c.accIconText}`} />
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className={`text-sm font-semibold truncate ${c.text}`}>Lab Report — PID Control Systems</p>
                         <p className={`text-[10px] ${c.textFaint}`}>Engineering · DOCX · Writing section 4 of 6</p>
                       </div>
                       <div className="flex items-center gap-1.5 flex-shrink-0">
-                        <Loader2 className="w-3.5 h-3.5 text-indigo-500 animate-spin" />
-                        <span className="text-[10px] text-indigo-600 font-medium">Writing…</span>
+                        <Loader2 className={`w-3.5 h-3.5 ${c.accIcon} animate-spin`} />
+                        <span className={`text-[10px] ${c.accTextSoft} font-medium`}>Writing…</span>
                       </div>
                     </div>
                     <div className="px-4 pt-3 pb-1">
                       <div className="flex items-center justify-between mb-1.5">
                         <span className={`text-[10px] ${c.textFaint}`}>Overall progress</span>
-                        <span className="text-[10px] text-indigo-600 font-semibold">58%</span>
+                        <span className={`text-[10px] ${c.accTextSoft} font-semibold`}>58%</span>
                       </div>
                       <div className={`w-full h-1.5 ${c.vramTrack} rounded-full overflow-hidden`}>
-                        <div className="h-full bg-gradient-to-r from-indigo-500 to-violet-500 rounded-full" style={{ width: "58%" }} />
+                        <div className={`h-full bg-gradient-to-r ${c.accProgGrad} rounded-full`} style={{ width: "58%" }} />
                       </div>
                     </div>
                     <div className="px-4 py-3 grid grid-cols-2 gap-y-2 gap-x-4">
                       {DOC_SECTIONS.map(sec => (
                         <div key={sec.label} className={`flex items-center gap-2 ${sec.active ? "opacity-100" : sec.done ? "opacity-70" : "opacity-40"}`}>
                           {sec.done ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" />
-                            : sec.active ? <Loader2 className="w-3.5 h-3.5 text-indigo-500 animate-spin flex-shrink-0" />
+                            : sec.active ? <Loader2 className={`w-3.5 h-3.5 ${c.accIcon} animate-spin flex-shrink-0`} />
                             : <Circle className={`w-3.5 h-3.5 flex-shrink-0 ${c.textGhost}`} />}
-                          <span className={`text-[11px] truncate ${sec.active ? "text-indigo-600 font-medium" : sec.done ? c.textBody : c.textFaint}`}>{sec.label}</span>
+                          <span className={`text-[11px] truncate ${sec.active ? `${c.accTextSoft} font-medium` : sec.done ? c.textBody : c.textFaint}`}>{sec.label}</span>
                         </div>
                       ))}
                     </div>
@@ -556,11 +592,11 @@ export function MainApp() {
                       <p className={`text-[10px] font-semibold uppercase tracking-wider mb-1.5 ${c.docPreviewLabel}`}>Preview — Experimental Setup</p>
                       <p className={`text-[11px] leading-relaxed font-mono ${c.docPreviewText}`}>
                         The experimental setup consisted of a DC servo motor connected to a rotary encoder providing position feedback at 1000 ppr. A dSPACE DS1104 controller board was used to implement the discrete-time PID algorithm at Ts = 1 ms. Gains were tuned using Ziegler–Nichols, yielding…
-                        <span className="inline-block w-2 h-3.5 bg-indigo-500 ml-0.5 animate-pulse align-text-bottom rounded-sm" />
+                        <span className={`inline-block w-2 h-3.5 ${c.accBgSolid} ml-0.5 animate-pulse align-text-bottom rounded-sm`} />
                       </p>
                     </div>
                     <div className="px-4 pb-4 flex items-center gap-2">
-                      <button className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium transition-colors">
+                      <button className={`flex items-center gap-1.5 px-3 py-2 rounded-xl ${c.accBg} ${c.accBgHover} text-white text-xs font-medium transition-colors`}>
                         <ExternalLink className="w-3 h-3" />Open in Word
                       </button>
                       <button className={`flex items-center gap-1.5 px-3 py-2 rounded-xl ${c.bgMuted} ${c.hoverMed} ${c.textBody} text-xs font-medium border ${c.border} transition-colors`}>
@@ -574,14 +610,14 @@ export function MainApp() {
             ) : (
               /* Typing indicator */
               <div className="flex gap-3 justify-start">
-                <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center flex-shrink-0 shadow-md shadow-indigo-500/20">
+                <div className={`w-7 h-7 rounded-lg bg-gradient-to-br ${c.accGrad} flex items-center justify-center flex-shrink-0 shadow-md ${c.accShadow}`}>
                   <GraduationCap className="w-3.5 h-3.5 text-white" />
                 </div>
                 <div className={`${c.card} border ${c.border} rounded-2xl rounded-tl-sm px-4 py-3`}>
                   <div className="flex gap-1 items-center h-4">
-                    <div className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-bounce" style={{ animationDelay: "0ms" }} />
-                    <div className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-bounce" style={{ animationDelay: "150ms" }} />
-                    <div className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-bounce" style={{ animationDelay: "300ms" }} />
+                    <div className={`w-1.5 h-1.5 rounded-full ${c.accDot} animate-bounce`} style={{ animationDelay: "0ms" }} />
+                    <div className={`w-1.5 h-1.5 rounded-full ${c.accDot} animate-bounce`} style={{ animationDelay: "150ms" }} />
+                    <div className={`w-1.5 h-1.5 rounded-full ${c.accDot} animate-bounce`} style={{ animationDelay: "300ms" }} />
                   </div>
                 </div>
               </div>
@@ -594,8 +630,7 @@ export function MainApp() {
           {/* Active tool badge */}
           {activeTool && (
             <div className="mb-3 flex items-center gap-2">
-              <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium border ${activeTool === "Write Doc" ? "bg-indigo-50 border-indigo-200 text-indigo-700" : activeTool === "Calculator" ? "bg-emerald-50 border-emerald-200 text-emerald-700" : "bg-amber-50 border-amber-200 text-amber-700"}`}
-                style={darkMode ? { background: activeTool === "Write Doc" ? "rgba(99,102,241,0.1)" : activeTool === "Calculator" ? "rgba(52,211,153,0.1)" : "rgba(251,191,36,0.1)", borderColor: activeTool === "Write Doc" ? "rgba(99,102,241,0.25)" : activeTool === "Calculator" ? "rgba(52,211,153,0.25)" : "rgba(251,191,36,0.25)", color: activeTool === "Write Doc" ? "#a5b4fc" : activeTool === "Calculator" ? "#6ee7b7" : "#fcd34d" } : {}}>
+              <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium border ${activeTool === "Write Doc" ? c.toolBadgeWrite : activeTool === "Calculator" ? c.toolBadgeCalc : c.toolBadgeSearch}`}>
                 {activeTool === "Write Doc" && <PenLine className="w-3 h-3" />}
                 {activeTool === "Calculator" && <Calculator className="w-3 h-3" />}
                 {activeTool === "Search Notes" && <Search className="w-3 h-3" />}
@@ -636,13 +671,13 @@ export function MainApp() {
           {toolsOpen && (
             <div className={`mb-3 p-2 rounded-2xl ${c.card} border ${c.borderMd} grid grid-cols-3 gap-1`}>
               {[
-                { id:"Write Doc",    icon: PenLine,    label:"Write Doc",    desc:"Write & edit docs",     colorClass:"text-indigo-600", bgClass:"bg-indigo-50 border-indigo-200/80" },
-                { id:"Calculator",   icon: Calculator, label:"Calculator",   desc:"School-specific calc",  colorClass:"text-emerald-600", bgClass:"bg-emerald-50 border-emerald-200/80" },
-                { id:"Search Notes", icon: Search,     label:"Search Notes", desc:"Search your memory",   colorClass:"text-amber-600",   bgClass:"bg-amber-50 border-amber-200/80" },
+                { id:"Write Doc",    icon: PenLine,    label:"Write Doc",    desc:"Write & edit docs",     iconClass: c.accIcon,            badgeClass: c.toolBadgeWrite },
+                { id:"Calculator",   icon: Calculator, label:"Calculator",   desc:"School-specific calc",  iconClass: darkMode ? "text-violet-300" : "text-emerald-600", badgeClass: c.toolBadgeCalc },
+                { id:"Search Notes", icon: Search,     label:"Search Notes", desc:"Search your memory",    iconClass: darkMode ? "text-amber-300"  : "text-amber-600",   badgeClass: c.toolBadgeSearch },
               ].map(tool => (
                 <button key={tool.id} onClick={() => pickTool(tool.id)}
-                  className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border transition-all hover:scale-[1.02] ${activeTool === tool.id ? `${tool.bgClass}` : `${c.border} ${c.hoverSub}`}`}>
-                  <tool.icon className={`w-5 h-5 ${tool.colorClass}`} style={darkMode ? { color: tool.id === "Write Doc" ? "#a5b4fc" : tool.id === "Calculator" ? "#6ee7b7" : "#fcd34d" } : {}} />
+                  className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border transition-all hover:scale-[1.02] ${activeTool === tool.id ? tool.badgeClass : `${c.border} ${c.hoverSub}`}`}>
+                  <tool.icon className={`w-5 h-5 ${tool.iconClass}`} />
                   <span className={`text-[11px] font-semibold ${c.textMd}`}>{tool.label}</span>
                   <span className={`text-[9px] ${c.textFaint} text-center leading-tight`}>{tool.desc}</span>
                 </button>
@@ -665,7 +700,7 @@ export function MainApp() {
                 ))}
               </div>
             </div>
-            <button className="w-10 h-10 flex items-center justify-center rounded-xl bg-indigo-600 hover:bg-indigo-500 transition-colors shadow-md shadow-indigo-500/20 flex-shrink-0 mb-0.5">
+            <button className={`w-10 h-10 flex items-center justify-center rounded-xl ${c.accBg} ${c.accBgHover} transition-colors shadow-md ${c.accShadow} flex-shrink-0 mb-0.5`}>
               <Send className="w-4 h-4 text-white" />
             </button>
           </div>
