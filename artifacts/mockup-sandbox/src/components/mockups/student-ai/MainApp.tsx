@@ -1,4 +1,12 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
+import {
+  api,
+  API_BASE,
+  type ApiSession,
+  type ApiMemoryItem,
+  type ApiSearchHit,
+  type ApiDocument,
+} from "./api";
 import {
   GraduationCap, Send, FileText, Image, BookOpen, Settings,
   ChevronRight, Paperclip, MoreHorizontal, WifiOff, Download,
@@ -302,62 +310,171 @@ export function MainApp() {
   };
   const userInitials = getInitials(profile.name);
 
-  /* Sessions (mutable for rename/delete) */
+  /* Sessions (backend-backed; INITIAL_SESSIONS used until backend responds) */
   const [sessions, setSessions] = useState<Session[]>(INITIAL_SESSIONS);
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
   const [editingSessionDraft, setEditingSessionDraft] = useState("");
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const startRenameSession = (s: Session) => { setEditingSessionId(s.id); setEditingSessionDraft(s.label); };
-  const commitRenameSession = () => {
+  const commitRenameSession = async () => {
     if (!editingSessionId) return;
     const next = editingSessionDraft.trim();
-    if (next) setSessions(prev => prev.map(s => s.id === editingSessionId ? { ...s, label: next } : s));
+    const id = editingSessionId;
     setEditingSessionId(null);
+    if (!next) return;
+    setSessions(prev => prev.map(s => s.id === id ? { ...s, label: next } : s));
+    if (currentSessionId === id) setActiveChat(next);
+    try { await api.renameSession(id, next); } catch (err) { reportError(err); }
   };
-  const deleteSession = (id: string) => {
-    setSessions(prev => {
-      const filtered = prev.filter(s => s.id !== id);
-      if (activeChat === prev.find(s => s.id === id)?.label && filtered.length > 0) {
-        setActiveChat(filtered[0].label);
-      }
-      return filtered;
-    });
+  const deleteSession = async (id: string) => {
+    const wasActive = id === currentSessionId;
+    setSessions(prev => prev.filter(s => s.id !== id));
     setPendingDeleteId(null);
+    try { await api.deleteSession(id); } catch (err) { reportError(err); }
+    const fresh = await refreshSessions();
+    if (wasActive) {
+      if (fresh.length > 0) {
+        await selectRemoteSession(fresh[0] as Session);
+      } else {
+        setCurrentSessionId(null);
+        setActiveChat("New Chat");
+        setMessages([]);
+        setIsEmptyChat(true);
+      }
+    }
   };
-  const startNewChat = () => {
-    const id = `s${Date.now()}`;
-    const label = "New Chat";
-    setSessions(prev => [{ id, label, time: "Now" }, ...prev]);
-    setActiveChat(label);
-    setIsEmptyChat(true);
-    setActiveTab("chat");
+  const startNewChat = async () => {
     setActiveTool(null);
+    setActiveTab("chat");
+    setSearchResults(null);
+    setCurrentDoc(null);
+    setMessages([]);
+    setIsEmptyChat(true);
+    try {
+      const created = await api.createSession("New Chat");
+      setSessions(prev => [created as Session, ...prev.filter(s => s.id !== created.id)]);
+      setCurrentSessionId(created.id);
+      setActiveChat(created.label);
+    } catch (err) {
+      reportError(err);
+      setActiveChat("New Chat");
+    }
   };
 
   /* Empty / first-run chat & thinking state */
   const [isEmptyChat, setIsEmptyChat] = useState(false);
   const [isThinking, setIsThinking] = useState(false);
 
-  /* ─── Backend wiring (talks to local Python FastAPI on the user's PC) ─── */
-  const API_BASE =
-    (import.meta as unknown as { env?: { VITE_API_BASE?: string } }).env
-      ?.VITE_API_BASE ?? "http://localhost:8000";
+  /* ─── Backend wiring (local Python FastAPI on http://localhost:8000) ─── */
   const [messages, setMessages] = useState<Message[]>(DEMO_MESSAGES);
   const [backendError, setBackendError] = useState<string | null>(null);
+  const [backendOnline, setBackendOnline] = useState<boolean>(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+
+  const [memoryItems, setMemoryItems] = useState<ApiMemoryItem[]>([]);
+  const [documents, setDocuments] = useState<ApiDocument[]>([]);
+
+  const [searchResults, setSearchResults] = useState<ApiSearchHit[] | null>(null);
+  const [searchLoading, setSearchLoading] = useState(false);
+
+  const [currentDoc, setCurrentDoc] = useState<ApiDocument | null>(null);
+  const [docGenerating, setDocGenerating] = useState(false);
 
   const nowStamp = () =>
     new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 
+  const reportError = (err: unknown) => {
+    const msg = err instanceof Error ? err.message : String(err);
+    setBackendError(msg);
+    setBackendOnline(false);
+  };
+
+  /* ── Load sessions / memory / documents on mount ── */
+  const refreshSessions = useCallback(async () => {
+    try {
+      const list = await api.listSessions();
+      setSessions(list as Session[]);
+      setBackendOnline(true);
+      setBackendError(null);
+      return list;
+    } catch (err) {
+      reportError(err);
+      return [] as ApiSession[];
+    }
+  }, []);
+
+  const refreshMemory = useCallback(async () => {
+    try {
+      setMemoryItems(await api.listMemory());
+    } catch (err) { reportError(err); }
+  }, []);
+
+  const refreshDocuments = useCallback(async () => {
+    try {
+      setDocuments(await api.listDocuments());
+    } catch (err) { reportError(err); }
+  }, []);
+
+  useEffect(() => {
+    (async () => {
+      const list = await refreshSessions();
+      await refreshMemory();
+      await refreshDocuments();
+      if (list.length > 0) {
+        const first = list[0];
+        setCurrentSessionId(first.id);
+        setActiveChat(first.label);
+        try {
+          const msgs = await api.getMessages(first.id);
+          if (msgs.length > 0) {
+            setMessages(msgs.map((m, i) => ({
+              id: i + 1, role: m.role, content: m.content, timestamp: nowStamp(),
+            })));
+            setIsEmptyChat(false);
+          } else {
+            setIsEmptyChat(true);
+          }
+        } catch (err) { reportError(err); }
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  /* ── Load messages when active session changes ── */
+  async function selectRemoteSession(s: Session) {
+    setCurrentSessionId(s.id);
+    setActiveChat(s.label);
+    setActiveTool(null);
+    setSearchResults(null);
+    setCurrentDoc(null);
+    try {
+      const msgs = await api.getMessages(s.id);
+      if (msgs.length === 0) {
+        setMessages([]);
+        setIsEmptyChat(true);
+      } else {
+        setMessages(msgs.map((m, i) => ({
+          id: i + 1, role: m.role, content: m.content, timestamp: nowStamp(),
+        })));
+        setIsEmptyChat(false);
+      }
+    } catch (err) { reportError(err); }
+  }
+
+  /* ── Send a chat message (or generate a doc when Write Doc is active) ── */
   async function sendToBackend(text: string) {
     const trimmed = text.trim();
     if (!trimmed) return;
 
+    if (activeTool === "Write Doc") {
+      await generateDoc(trimmed);
+      return;
+    }
+
     const userMsg: Message = {
-      id: Date.now(),
-      role: "user",
-      content: trimmed,
-      timestamp: nowStamp(),
+      id: Date.now(), role: "user", content: trimmed, timestamp: nowStamp(),
     };
     setMessages(prev => [...prev, userMsg]);
     setInput("");
@@ -366,37 +483,23 @@ export function MainApp() {
     setBackendError(null);
 
     try {
-      const res = await fetch(`${API_BASE}/chat`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          message: trimmed,
-          history: messages.map(m => ({ role: m.role, content: m.content })),
-        }),
-      });
-      if (!res.ok) throw new Error(`Backend returned ${res.status}`);
-      const data = (await res.json()) as { reply: string; timestamp: string };
+      const data = await api.chat(trimmed, currentSessionId);
+      setBackendOnline(true);
       setMessages(prev => [
         ...prev,
-        {
-          id: Date.now() + 1,
-          role: "assistant",
-          content: data.reply,
-          timestamp: data.timestamp ?? nowStamp(),
-        },
+        { id: Date.now() + 1, role: "assistant", content: data.reply, timestamp: data.timestamp ?? nowStamp() },
       ]);
+      if (!currentSessionId) setCurrentSessionId(data.session_id);
+      refreshSessions();
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      setBackendError(msg);
+      reportError(err);
       setMessages(prev => [
         ...prev,
         {
-          id: Date.now() + 1,
-          role: "assistant",
+          id: Date.now() + 1, role: "assistant",
           content:
             `*(Couldn't reach the local backend at ${API_BASE}.)*\n\n` +
-            "Start the Python server: open `python-backend/` and run " +
-            "`python main.py`. Once it's listening on port 8000, try again.",
+            "Start the Python server: open `python-backend/` and run `python main.py`.",
           timestamp: nowStamp(),
         },
       ]);
@@ -405,31 +508,96 @@ export function MainApp() {
     }
   }
 
-  async function uploadPdfToBackend(file: File) {
+  /* ── Document generation via Write Doc tool ── */
+  async function generateDoc(prompt: string, format: "docx" | "pdf" = "docx") {
+    setInput("");
+    setIsEmptyChat(false);
+    setDocGenerating(true);
+    setCurrentDoc(null);
     setBackendError(null);
-    const fd = new FormData();
-    fd.append("file", file);
+
+    setMessages(prev => [
+      ...prev,
+      { id: Date.now(), role: "user", content: `[Write Doc] ${prompt}`, timestamp: nowStamp() },
+    ]);
+
     try {
-      const res = await fetch(`${API_BASE}/upload-pdf`, { method: "POST", body: fd });
-      if (!res.ok) throw new Error(`Upload failed (${res.status})`);
-      const data = (await res.json()) as { filename: string; size_bytes: number };
+      const doc = await api.generateDocument(prompt, {
+        format, session_id: currentSessionId,
+      });
+      setBackendOnline(true);
+      setCurrentDoc(doc);
       setMessages(prev => [
         ...prev,
         {
-          id: Date.now(),
-          role: "assistant",
-          content:
-            `Added **${data.filename}** to your local memory ` +
-            `(${Math.round(data.size_bytes / 1024)} KB). ` +
-            "I can now reference it in our chat.",
+          id: Date.now() + 1, role: "assistant",
+          content: `Generated **${doc.title}** — ${doc.format.toUpperCase()} · ${Math.round(doc.size_bytes / 1024)} KB.\nClick **Open in Word** or **Save PDF** below to download.`,
           timestamp: nowStamp(),
         },
       ]);
+      refreshDocuments();
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      setBackendError(msg);
+      reportError(err);
+      setMessages(prev => [
+        ...prev,
+        {
+          id: Date.now() + 1, role: "assistant",
+          content: `*(Couldn't generate document — backend unreachable at ${API_BASE}.)* Start the Python server first.`,
+          timestamp: nowStamp(),
+        },
+      ]);
+    } finally {
+      setDocGenerating(false);
     }
   }
+
+  /* ── Memory uploads ── */
+  async function uploadPdfToBackend(file: File) {
+    setBackendError(null);
+    try {
+      const item = await api.uploadFile(file);
+      setBackendOnline(true);
+      await refreshMemory();
+      setMessages(prev => [
+        ...prev,
+        {
+          id: Date.now(), role: "assistant",
+          content:
+            `Added **${item.filename}** to your local memory ` +
+            `(${Math.round(item.size_bytes / 1024)} KB). I can now reference it in our chat.`,
+          timestamp: nowStamp(),
+        },
+      ]);
+    } catch (err) { reportError(err); }
+  }
+
+  async function removeMemoryItem(id: string) {
+    try {
+      await api.deleteMemory(id);
+      await refreshMemory();
+    } catch (err) { reportError(err); }
+  }
+
+  /* ── Search (debounced) ── */
+  useEffect(() => {
+    if (activeTool !== "Search Notes") { setSearchResults(null); return; }
+    const q = searchQuery.trim();
+    if (!q) { setSearchResults([]); return; }
+    setSearchLoading(true);
+    const t = window.setTimeout(async () => {
+      try {
+        const out = await api.search(q);
+        setSearchResults(out.results);
+        setBackendOnline(true);
+      } catch (err) {
+        reportError(err);
+        setSearchResults([]);
+      } finally {
+        setSearchLoading(false);
+      }
+    }, 250);
+    return () => window.clearTimeout(t);
+  }, [searchQuery, activeTool]);
 
   const sendSuggestion = (text: string) => {
     setIsEmptyChat(false);
@@ -533,6 +701,14 @@ export function MainApp() {
   }
 
   function selectChat(label: string) { setActiveChat(label); setSidebarOpen(false); }
+  function pickIcon(kind: ApiMemoryItem["kind"]) {
+    return kind === "image" ? Image : kind === "doc" ? BookOpen : FileText;
+  }
+  function memoryDate(iso: string) {
+    try {
+      return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+    } catch { return ""; }
+  }
   function pickTool(id: string) { setActiveTool(id); setToolsOpen(false); }
 
   const school = CALC_SCHOOLS.find(s => s.id === calcSchool) ?? CALC_SCHOOLS[0];
@@ -598,7 +774,7 @@ export function MainApp() {
                         />
                       ) : (
                         <button
-                          onClick={() => selectChat(s.label)}
+                          onClick={() => selectRemoteSession(s)}
                           className="flex-1 flex items-center gap-2 text-left min-w-0"
                           title={s.label}
                         >
@@ -651,13 +827,25 @@ export function MainApp() {
 
               <p className={`text-[10px] uppercase tracking-widest font-semibold px-2 mt-5 mb-2 ${c.textFaint}`}>Memory</p>
               <div className="space-y-0.5">
-                {MEMORY_ITEMS.map(m => (
-                  <button key={m.label} className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left transition-all ${c.textMuted} ${c.hoverSub}`}>
-                    <m.icon className="w-3.5 h-3.5 flex-shrink-0 text-violet-500" />
-                    <span className={`text-xs flex-1 truncate ${c.textBody}`}>{m.label}</span>
-                    <span className={`text-[10px] ${c.textXs}`}>{m.date}</span>
-                  </button>
-                ))}
+                {memoryItems.length === 0 && (
+                  <p className={`text-[11px] px-3 py-2 ${c.textFaint}`}>
+                    No files yet — drop a PDF or image to start.
+                  </p>
+                )}
+                {memoryItems.map(m => {
+                  const Icon = pickIcon(m.kind);
+                  return (
+                    <a key={m.id}
+                       href={api.url(`/memory/${m.id}/file`)}
+                       target="_blank" rel="noreferrer"
+                       title={m.filename}
+                       className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left transition-all ${c.textMuted} ${c.hoverSub}`}>
+                      <Icon className="w-3.5 h-3.5 flex-shrink-0 text-violet-500" />
+                      <span className={`text-xs flex-1 truncate ${c.textBody}`}>{m.filename}</span>
+                      <span className={`text-[10px] ${c.textXs}`}>{memoryDate(m.created_at)}</span>
+                    </a>
+                  );
+                })}
               </div>
             </div>
 
@@ -826,12 +1014,16 @@ export function MainApp() {
             </div>
 
             <p className={`text-[11px] mb-4 ${c.textFaint}`}>
-              About <span className={`font-semibold ${c.textBody}`}>4 results</span> for "{searchQuery}" in your memory
+              {searchLoading
+                ? <>Searching your memory…</>
+                : searchResults === null || !searchQuery.trim()
+                  ? <>Type a query to search your local memory.</>
+                  : <>About <span className={`font-semibold ${c.textBody}`}>{searchResults.length} result{searchResults.length === 1 ? "" : "s"}</span> for "{searchQuery}" in your memory</>}
             </p>
 
             <div className="space-y-3">
-              {SEARCH_RESULTS.map((r, i) => (
-                <div key={i} className={`group rounded-xl border ${c.searchResult} transition-all p-4`}>
+              {(searchResults ?? []).map(r => (
+                <div key={r.id} className={`group rounded-xl border ${c.searchResult} transition-all p-4`}>
                   <div className="flex items-start gap-3 mb-2">
                     <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5 ${r.type === "image" ? "bg-violet-100" : r.type === "pdf" ? "bg-rose-100" : "bg-blue-100"}`}>
                       {r.type === "image"
@@ -839,7 +1031,11 @@ export function MainApp() {
                         : <FileText className={`w-4 h-4 ${r.type === "pdf" ? "text-rose-500" : "text-blue-500"}`} />}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <button className="text-left text-indigo-600 hover:text-indigo-500 hover:underline text-sm font-medium leading-snug transition-colors">{r.title}</button>
+                      <a
+                        href={api.url(`/memory/${r.id}/file`)}
+                        target="_blank" rel="noreferrer"
+                        className="text-left text-indigo-600 hover:text-indigo-500 hover:underline text-sm font-medium leading-snug transition-colors"
+                      >{r.title}</a>
                       <p className={`text-[10px] mt-0.5 font-mono ${c.searchBreadcrumb}`}>{r.path}</p>
                     </div>
                     <div className={`flex-shrink-0 flex items-center gap-1.5 px-2 py-0.5 rounded-full ${c.bgMuted} border ${c.border}`}>
@@ -852,13 +1048,26 @@ export function MainApp() {
                   <div className="flex items-center gap-2 ml-11">
                     <span className={`text-[10px] ${c.textXs}`}>{r.meta}</span>
                     <div className={`w-px h-3 ${c.bgBrt} rounded`} />
-                    <button className="flex items-center gap-1 text-[11px] text-indigo-600 hover:text-indigo-500 font-medium transition-colors">
+                    <a
+                      href={api.url(`/memory/${r.id}/file`)}
+                      target="_blank" rel="noreferrer"
+                      className="flex items-center gap-1 text-[11px] text-indigo-600 hover:text-indigo-500 font-medium transition-colors"
+                    >
                       <ExternalLink className="w-3 h-3" />Open file
-                    </button>
-                    <button className={`text-[11px] font-medium transition-colors ${c.textFaint} ${c.hoverMuted}`}>Reference in chat</button>
+                    </a>
+                    <button
+                      onClick={() => {
+                        setActiveTool(null);
+                        setInput(prev => `${prev ? prev + " " : ""}[${r.title}] `);
+                      }}
+                      className={`text-[11px] font-medium transition-colors ${c.textFaint} ${c.hoverMuted}`}
+                    >Reference in chat</button>
                   </div>
                 </div>
               ))}
+              {searchResults !== null && searchResults.length === 0 && searchQuery.trim() && !searchLoading && (
+                <p className={`text-[11px] ${c.textFaint}`}>No matches yet — upload PDFs or images to your memory first.</p>
+              )}
             </div>
 
             <div className={`mt-5 flex items-center gap-2 px-4 py-2.5 rounded-xl ${c.searchTipBg} border`}>
@@ -971,15 +1180,17 @@ export function MainApp() {
               </div>
             ))}
 
-            {/* Document generation card */}
-            {activeTool === "Write Doc" && (
+            {/* Document generation card (real generation via Python backend) */}
+            {(docGenerating || currentDoc) && (
               <div className="flex gap-3 justify-start">
                 <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center flex-shrink-0 mt-0.5 shadow-md shadow-indigo-500/20">
                   <GraduationCap className="w-3.5 h-3.5 text-white" />
                 </div>
                 <div className="flex-1 max-w-[85%]">
                   <div className={`rounded-2xl px-4 py-3 text-sm mb-3 leading-relaxed ${c.assistMsg}`}>
-                    Sure — I'm writing your lab report now. I'll structure it across 6 sections based on your notes and uploaded diagram.
+                    {docGenerating
+                      ? "Writing your document locally — using your prompt and any context I have…"
+                      : `Done — your ${currentDoc?.format.toUpperCase()} is ready. Use the buttons below to save it.`}
                   </div>
                   <div className={`rounded-2xl border ${c.docCard} overflow-hidden`}>
                     <div className={`px-4 py-3 ${c.docHeader} flex items-center gap-3`}>
@@ -987,48 +1198,81 @@ export function MainApp() {
                         <FileText className="w-4 h-4 text-indigo-600" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className={`text-sm font-semibold truncate ${c.text}`}>Lab Report — PID Control Systems</p>
-                        <p className={`text-[10px] ${c.textFaint}`}>Engineering · DOCX · Writing section 4 of 6</p>
+                        <p className={`text-sm font-semibold truncate ${c.text}`}>
+                          {currentDoc?.title ?? "Generating document…"}
+                        </p>
+                        <p className={`text-[10px] ${c.textFaint}`}>
+                          {currentDoc
+                            ? `${currentDoc.format.toUpperCase()} · ${Math.max(1, Math.round(currentDoc.size_bytes / 1024))} KB · saved locally`
+                            : "Building structure from your prompt"}
+                        </p>
                       </div>
                       <div className="flex items-center gap-1.5 flex-shrink-0">
-                        <Loader2 className="w-3.5 h-3.5 text-indigo-500 animate-spin" />
-                        <span className="text-[10px] text-indigo-600 font-medium">Writing…</span>
+                        {docGenerating ? (
+                          <>
+                            <Loader2 className="w-3.5 h-3.5 text-indigo-500 animate-spin" />
+                            <span className="text-[10px] text-indigo-600 font-medium">Writing…</span>
+                          </>
+                        ) : (
+                          <>
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                            <span className="text-[10px] text-emerald-600 font-medium">Ready</span>
+                          </>
+                        )}
                       </div>
                     </div>
                     <div className="px-4 pt-3 pb-1">
                       <div className="flex items-center justify-between mb-1.5">
                         <span className={`text-[10px] ${c.textFaint}`}>Overall progress</span>
-                        <span className="text-[10px] text-indigo-600 font-semibold">58%</span>
+                        <span className="text-[10px] text-indigo-600 font-semibold">{docGenerating ? "Working…" : "100%"}</span>
                       </div>
                       <div className={`w-full h-1.5 ${c.vramTrack} rounded-full overflow-hidden`}>
-                        <div className="h-full bg-gradient-to-r from-indigo-500 to-violet-500 rounded-full" style={{ width: "58%" }} />
+                        <div className="h-full bg-gradient-to-r from-indigo-500 to-violet-500 rounded-full transition-all"
+                          style={{ width: docGenerating ? "60%" : "100%" }} />
                       </div>
                     </div>
                     <div className="px-4 py-3 grid grid-cols-2 gap-y-2 gap-x-4">
-                      {DOC_SECTIONS.map(sec => (
-                        <div key={sec.label} className={`flex items-center gap-2 ${sec.active ? "opacity-100" : sec.done ? "opacity-70" : "opacity-40"}`}>
-                          {sec.done ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" />
-                            : sec.active ? <Loader2 className="w-3.5 h-3.5 text-indigo-500 animate-spin flex-shrink-0" />
-                            : <Circle className={`w-3.5 h-3.5 flex-shrink-0 ${c.textGhost}`} />}
-                          <span className={`text-[11px] truncate ${sec.active ? "text-indigo-600 font-medium" : sec.done ? c.textBody : c.textFaint}`}>{sec.label}</span>
-                        </div>
-                      ))}
-                    </div>
-                    <div className={`mx-4 mb-3 rounded-lg ${c.docPreview} border px-3 py-2.5`}>
-                      <p className={`text-[10px] font-semibold uppercase tracking-wider mb-1.5 ${c.docPreviewLabel}`}>Preview — Experimental Setup</p>
-                      <p className={`text-[11px] leading-relaxed font-mono ${c.docPreviewText}`}>
-                        The experimental setup consisted of a DC servo motor connected to a rotary encoder providing position feedback at 1000 ppr. A dSPACE DS1104 controller board was used to implement the discrete-time PID algorithm at Ts = 1 ms. Gains were tuned using Ziegler–Nichols, yielding…
-                        <span className="inline-block w-2 h-3.5 bg-indigo-500 ml-0.5 animate-pulse align-text-bottom rounded-sm" />
-                      </p>
+                      {(currentDoc?.sections ?? DOC_SECTIONS.map(s => s.label)).map((label, i) => {
+                        const done = !docGenerating;
+                        return (
+                          <div key={label} className={`flex items-center gap-2 ${done ? "opacity-100" : i === 0 ? "opacity-100" : "opacity-40"}`}>
+                            {done ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" />
+                              : i === 0 ? <Loader2 className="w-3.5 h-3.5 text-indigo-500 animate-spin flex-shrink-0" />
+                              : <Circle className={`w-3.5 h-3.5 flex-shrink-0 ${c.textGhost}`} />}
+                            <span className={`text-[11px] truncate ${done ? c.textBody : i === 0 ? "text-indigo-600 font-medium" : c.textFaint}`}>{label}</span>
+                          </div>
+                        );
+                      })}
                     </div>
                     <div className="px-4 pb-4 flex items-center gap-2">
-                      <button className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium transition-colors">
-                        <ExternalLink className="w-3 h-3" />Open in Word
-                      </button>
-                      <button className={`flex items-center gap-1.5 px-3 py-2 rounded-xl ${c.bgMuted} ${c.hoverMed} ${c.textBody} text-xs font-medium border ${c.border} transition-colors`}>
-                        <Download className="w-3 h-3" />Save PDF
-                      </button>
-                      <button className={`ml-auto text-[10px] ${c.textXs} transition-colors`}>Cancel</button>
+                      {currentDoc ? (
+                        <>
+                          <a
+                            href={api.url(currentDoc.download_url)}
+                            download
+                            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium transition-colors"
+                          >
+                            <Download className="w-3 h-3" />
+                            {currentDoc.format === "docx" ? "Open in Word" : "Save PDF"}
+                          </a>
+                          <button
+                            onClick={() => generateDoc(
+                              currentDoc.title,
+                              currentDoc.format === "docx" ? "pdf" : "docx",
+                            )}
+                            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl ${c.bgMuted} ${c.hoverMed} ${c.textBody} text-xs font-medium border ${c.border} transition-colors`}
+                          >
+                            <FileText className="w-3 h-3" />
+                            Also as {currentDoc.format === "docx" ? "PDF" : "DOCX"}
+                          </button>
+                        </>
+                      ) : (
+                        <span className={`text-[11px] ${c.textFaint}`}>Hang tight…</span>
+                      )}
+                      <button
+                        onClick={() => { setCurrentDoc(null); setActiveTool(null); }}
+                        className={`ml-auto text-[10px] ${c.textXs} transition-colors`}
+                      >Close</button>
                     </div>
                   </div>
                 </div>
@@ -1183,40 +1427,70 @@ export function MainApp() {
               </button>
             </div>
             <div className="flex-1 overflow-y-auto p-4 space-y-3">
-              {[
-                { icon: FileText, label: "PID Control Notes", date: "Nov 12", colorIcon: "text-blue-500",   bg: "bg-blue-100",   desc: "12 pages · Lecture notes from ME301" },
-                { icon: Image,    label: "Lab Diagram — Servo", date: "Nov 10", colorIcon: "text-violet-500", bg: "bg-violet-100", desc: "Whiteboard photo · Feedback loop diagram" },
-              ].map(item => (
-                <div key={item.label} className={`rounded-xl ${c.bgSub} border ${c.border} p-3`}>
-                  <div className="flex items-start gap-2.5">
-                    <div className={`w-7 h-7 rounded-lg ${item.bg} flex items-center justify-center flex-shrink-0`}>
-                      <item.icon className={`w-3.5 h-3.5 ${item.colorIcon}`} />
+              {memoryItems.length === 0 && (
+                <p className={`text-[11px] ${c.textFaint}`}>
+                  No items yet. Use the button below or the paperclip in the chat input
+                  to drop in a PDF or image.
+                </p>
+              )}
+              {memoryItems.map(item => {
+                const Icon = pickIcon(item.kind);
+                const tone =
+                  item.kind === "image"
+                    ? { bg: "bg-violet-100", color: "text-violet-500" }
+                    : item.kind === "pdf"
+                      ? { bg: "bg-rose-100",   color: "text-rose-500" }
+                      : { bg: "bg-blue-100",   color: "text-blue-500" };
+                const kb = Math.max(1, Math.round(item.size_bytes / 1024));
+                return (
+                  <div key={item.id} className={`rounded-xl ${c.bgSub} border ${c.border} p-3`}>
+                    <div className="flex items-start gap-2.5">
+                      <div className={`w-7 h-7 rounded-lg ${tone.bg} flex items-center justify-center flex-shrink-0`}>
+                        <Icon className={`w-3.5 h-3.5 ${tone.color}`} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <a href={api.url(`/memory/${item.id}/file`)} target="_blank" rel="noreferrer"
+                           className={`text-xs font-medium truncate block hover:underline ${c.textMd}`}>{item.filename}</a>
+                        <p className={`text-[10px] mt-0.5 ${c.textFaint}`}>{item.kind.toUpperCase()} · {kb} KB</p>
+                        <p className={`text-[10px] mt-1 ${c.textXs}`}>{memoryDate(item.created_at)}</p>
+                      </div>
+                      <button
+                        onClick={() => removeMemoryItem(item.id)}
+                        title="Remove from memory"
+                        className={`${c.textGhost} hover:text-rose-400 transition-colors`}>
+                        <X className="w-3.5 h-3.5" />
+                      </button>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className={`text-xs font-medium truncate ${c.textMd}`}>{item.label}</p>
-                      <p className={`text-[10px] mt-0.5 ${c.textFaint}`}>{item.desc}</p>
-                      <p className={`text-[10px] mt-1 ${c.textXs}`}>{item.date}</p>
-                    </div>
-                    <button className={`${c.textGhost} transition-colors`}><X className="w-3.5 h-3.5" /></button>
                   </div>
-                </div>
-              ))}
+                );
+              })}
               <div className="mt-2">
                 <p className={`text-[10px] uppercase tracking-widest font-semibold mb-2 ${c.textFaint}`}>Generated Documents</p>
-                {[{ label:"Lab Report — PID Control", format:"DOCX", date:"Now" }, { label:"Summary — Thermodynamics", format:"PDF", date:"Yesterday" }].map(doc => (
-                  <div key={doc.label} className={`flex items-center gap-2.5 py-2.5 border-b ${c.border}`}>
+                {documents.length === 0 && (
+                  <p className={`text-[11px] ${c.textFaint} pb-2`}>
+                    None yet — use the <span className="font-semibold">Write Doc</span> tool to create one.
+                  </p>
+                )}
+                {documents.map(doc => (
+                  <div key={doc.id} className={`flex items-center gap-2.5 py-2.5 border-b ${c.border}`}>
                     <div className="w-7 h-7 rounded-lg bg-emerald-100 flex items-center justify-center">
                       <FileText className="w-3.5 h-3.5 text-emerald-600" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className={`text-xs truncate ${c.textBody}`}>{doc.label}</p>
-                      <p className={`text-[10px] ${c.textXs}`}>{doc.format} · {doc.date}</p>
+                      <p className={`text-xs truncate ${c.textBody}`}>{doc.title}</p>
+                      <p className={`text-[10px] ${c.textXs}`}>{doc.format.toUpperCase()} · {memoryDate(doc.created_at)}</p>
                     </div>
-                    <button className={`${c.textGhost} transition-colors`}><Download className="w-3.5 h-3.5" /></button>
+                    <a href={api.url(doc.download_url)} download
+                       title="Download"
+                       className={`${c.textGhost} hover:text-indigo-500 transition-colors`}>
+                      <Download className="w-3.5 h-3.5" />
+                    </a>
                   </div>
                 ))}
               </div>
-              <button className={`w-full mt-2 flex items-center justify-center gap-2 py-2.5 rounded-xl border border-dashed ${c.borderBrt} text-xs ${c.textFaint} ${c.hoverSub} transition-colors`}>
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className={`w-full mt-2 flex items-center justify-center gap-2 py-2.5 rounded-xl border border-dashed ${c.borderBrt} text-xs ${c.textFaint} ${c.hoverSub} transition-colors`}>
                 <Plus className="w-3.5 h-3.5" />Add files to memory
               </button>
             </div>
