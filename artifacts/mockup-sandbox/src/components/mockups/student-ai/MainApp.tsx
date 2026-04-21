@@ -286,8 +286,11 @@ export function MainApp() {
                   <Sparkles className="w-4 h-4 text-white" />
                 </div>
                 <div>
-                  <p className={`text-sm font-semibold tracking-tight whitespace-nowrap ${c.text}`}>My_GPT 4 Students</p>
-                  <p className={`text-[10px] font-medium ${c.textMuted}`}>Offline · Local Model</p>
+                  <p className={`text-sm tracking-tight whitespace-nowrap ${c.text}`}>
+                    <span className="font-bold">MyGPT</span>
+                    <span className={`font-light ml-1 ${c.textBody}`}>for Students</span>
+                  </p>
+                  <p className={`text-[10px] font-medium ${c.textMuted}`}>Your offline study companion</p>
                 </div>
               </div>
               <button onClick={() => setSidebarOpen(false)} className={`w-7 h-7 flex items-center justify-center rounded-lg ${c.textMuted} ${c.hoverMuted} transition-colors`}>
