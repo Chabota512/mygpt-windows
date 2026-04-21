@@ -505,8 +505,9 @@ export function MainApp() {
         {
           id: Date.now() + 1, role: "assistant",
           content:
-            `*(Couldn't reach the local backend at ${API_BASE}.)*\n\n` +
-            "Start the Python server: open `python-backend/` and run `python main.py`.",
+            "Hmm, I lost my train of thought for a moment 😅\n\n" +
+            "Please give it a second and try again. If it keeps happening, " +
+            "close and reopen the app — that usually fixes it.",
           timestamp: nowStamp(),
         },
       ]);
@@ -549,7 +550,9 @@ export function MainApp() {
         ...prev,
         {
           id: Date.now() + 1, role: "assistant",
-          content: `*(Couldn't generate document — backend unreachable at ${API_BASE}.)* Start the Python server first.`,
+          content:
+            "I couldn't put your document together right now. " +
+            "Please try again in a moment — if it still doesn't work, close and reopen the app.",
           timestamp: nowStamp(),
         },
       ]);
@@ -972,13 +975,13 @@ export function MainApp() {
             >
               <Settings className="w-4 h-4" />
             </button>
-            {/* Backend status dot — green = local server reachable, amber = offline */}
+            {/* Friendly status dot */}
             <span
               title={backendOnline
-                ? "Local backend connected (offline-ready)"
-                : `Local backend offline — start python-backend/main.py${backendError ? ` · ${backendError}` : ""}`}
+                ? "Ready · everything's running on your computer"
+                : "Reconnecting… if this stays, please reopen the app"}
               className={`w-2 h-2 rounded-full ${backendOnline ? "bg-emerald-500" : "bg-amber-500 animate-pulse"}`}
-              aria-label={backendOnline ? "Backend connected" : "Backend offline"}
+              aria-label={backendOnline ? "Ready" : "Reconnecting"}
             />
             {/* User profile button */}
             <button
@@ -1421,8 +1424,8 @@ export function MainApp() {
           </div>
           <p className={`text-[10px] mt-2.5 px-1 ${c.textGhost}`}>
             All processing is done locally · No internet needed
-            {backendError && (
-              <span className="text-rose-400"> · backend offline ({backendError})</span>
+            {backendError && !backendOnline && (
+              <span className="text-amber-400"> · reconnecting…</span>
             )}
           </p>
         </div>
