@@ -17,11 +17,43 @@ python main.py
 The server starts on **http://localhost:8000**. The React frontend already
 points at this address.
 
-Test it from another terminal:
+## Where your data is kept ("head on PC, body on external drive")
 
-```bat
-curl http://localhost:8000/health
+The app code itself is small — only a few megabytes. But uploaded notes,
+generated documents, and the chat database can grow over time. So we let
+**you** decide where the data lives.
+
+You have three choices, in order of priority:
+
+1. **Set an environment variable** (most flexible)
+   ```bat
+   set MYGPT_DATA_DIR=E:\MyGPTData
+   python main.py
+   ```
+
+2. **Edit `data_location.txt`** (easiest — no terminal needed)
+   Just open `data_location.txt` in Notepad and put a folder path on a line
+   of its own, for example:
+   ```
+   E:\MyGPTData
+   ```
+   Save the file and start the app — your chats, files, and documents will
+   now live on the external drive.
+
+3. **Do nothing** — data is kept inside this folder under `./data/`.
+
+When the app starts, it prints the data folder it's using:
 ```
+[My_GPT] Data folder: E:\MyGPTData
+```
+
+### Tip for low-disk-space PCs
+
+Plug in a USB stick or external drive, create a folder on it (say
+`E:\MyGPTData`), put that path in `data_location.txt`, and you're done.
+The app on the PC stays tiny; the heavy stuff lives on the drive.
+You can even unplug the drive when you don't need the app — just plug it
+back in before you start it again.
 
 ## Plugging in Ollama (real offline AI)
 
@@ -44,21 +76,22 @@ That's it — the React UI now talks to a real local LLM.
 
 ## Endpoints
 
-| Method | Path          | What it does                                  |
-|--------|---------------|-----------------------------------------------|
-| GET    | `/health`     | Liveness check.                               |
-| POST   | `/chat`       | Send a message, get a reply.                  |
-| POST   | `/upload-pdf` | Upload a PDF / image into the local memory.   |
-
-Uploaded files are stored in `./uploads/` next to `main.py`.
+| Method | Path                  | What it does                                  |
+|--------|-----------------------|-----------------------------------------------|
+| GET    | `/health`             | Liveness check.                               |
+| POST   | `/chat`               | Send a message, get a reply.                  |
+| POST   | `/upload-pdf`         | Upload a PDF / image into the local memory.   |
+| GET    | `/memory`             | List items in local memory.                   |
+| POST   | `/search`             | Full-text search across uploaded notes.       |
+| POST   | `/documents/generate` | Generate a DOCX or PDF document.              |
+| GET    | `/profile`            | Get the user profile (offline cached).        |
+| PUT    | `/profile`            | Save the user profile.                        |
 
 ## Next steps (when you're ready)
 
-- **Memory (RAG):** add `chromadb` + `sentence-transformers`, chunk PDFs on
-  upload, retrieve relevant chunks before calling the LLM.
+- **Smarter memory (RAG):** add `chromadb` + `sentence-transformers`,
+  chunk PDFs on upload, retrieve relevant chunks before calling the LLM.
 - **Vision:** swap to a multimodal model like `llava` or `moondream` and
   send image bytes to `ollama.chat(..., images=[bytes])`.
-- **Documents out:** add `python-docx` and a `/export-docx` endpoint that
-  turns a chat reply into a `.docx` file.
 - **Package as `.exe`:** `pip install pyinstaller` then
   `pyinstaller --onefile main.py`.

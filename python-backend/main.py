@@ -39,12 +39,53 @@ import uvicorn
 # ──────────────────────────────────────────────────────────────────────
 # Paths & DB
 # ──────────────────────────────────────────────────────────────────────
+# "Head on PC, body wherever you want" model:
+#   - Code lives next to this file (small).
+#   - Data (uploads, generated docs, chat database, profile) lives in DATA_DIR.
+#
+# Where DATA_DIR comes from, in order of priority:
+#   1. Environment variable  MYGPT_DATA_DIR=E:\MyGPTData
+#   2. data_location.txt    sitting next to this script (one line: a folder path)
+#   3. Default:             ./data  (next to this script)
+#
+# Users with low disk space can simply edit data_location.txt and point it at
+# an external drive — no code changes needed.
+# ──────────────────────────────────────────────────────────────────────
 ROOT = Path(__file__).parent
-UPLOAD_DIR = ROOT / "uploads"
-EXPORT_DIR = ROOT / "exports"
-DB_PATH = ROOT / "studentai.db"
+LOCATION_FILE = ROOT / "data_location.txt"
+
+
+def resolve_data_dir() -> Path:
+    env = os.environ.get("MYGPT_DATA_DIR", "").strip()
+    if env:
+        return Path(env).expanduser().resolve()
+    if LOCATION_FILE.exists():
+        line = LOCATION_FILE.read_text("utf-8").strip().splitlines()
+        for raw in line:
+            raw = raw.strip()
+            if raw and not raw.startswith("#"):
+                return Path(raw).expanduser().resolve()
+    return (ROOT / "data").resolve()
+
+
+DATA_DIR = resolve_data_dir()
+try:
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+except OSError as e:
+    raise SystemExit(
+        f"Could not create data folder at {DATA_DIR}.\n"
+        f"  Reason: {e}\n"
+        f"  Fix: edit {LOCATION_FILE} and set a folder you can write to "
+        f"(for example E:\\MyGPTData on an external drive)."
+    )
+
+UPLOAD_DIR = DATA_DIR / "uploads"
+EXPORT_DIR = DATA_DIR / "exports"
+DB_PATH    = DATA_DIR / "studentai.db"
 UPLOAD_DIR.mkdir(exist_ok=True)
 EXPORT_DIR.mkdir(exist_ok=True)
+
+print(f"[My_GPT] Data folder: {DATA_DIR}")
 
 
 def db() -> sqlite3.Connection:
@@ -709,7 +750,7 @@ def delete_document(doc_id: str):
 # ──────────────────────────────────────────────────────────────────────
 # Profile (just JSON on disk so it persists across restarts)
 # ──────────────────────────────────────────────────────────────────────
-PROFILE_PATH = ROOT / "profile.json"
+PROFILE_PATH = DATA_DIR / "profile.json"
 
 
 class Profile(BaseModel):

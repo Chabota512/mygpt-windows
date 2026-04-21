@@ -1,0 +1,17 @@
+# My_GPT 4 Students — where to keep your data
+#
+# Lines starting with # are ignored.
+# Put ONE folder path on its own line, and the app will store everything there:
+# your chats, uploaded notes, generated documents, and your profile.
+#
+# Examples:
+#   E:\MyGPTData
+#   D:\Studies\MyGPT
+#   /Volumes/MyUSB/MyGPT
+#
+# Tip for low disk space: plug in an external drive, create a folder on it,
+# and paste its path on the line below (without the #).
+#
+# If you leave this file as-is, data is kept inside the app folder, in a
+# subfolder called "data".
+
