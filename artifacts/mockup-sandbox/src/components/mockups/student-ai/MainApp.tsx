@@ -7,7 +7,7 @@ import {
   PenLine, Calculator, ChevronUp, Search,
   ExternalLink, CheckCircle2, Circle, Loader2,
   FlaskConical, TrendingUp, Scale, Stethoscope, BarChart2,
-  GripHorizontal, Minimize2, Sun, Moon
+  GripHorizontal, Minimize2, Sun, Moon, ZoomIn, ZoomOut
 } from "lucide-react";
 
 /* ─────────────── Types ─────────────── */
@@ -225,6 +225,13 @@ export function MainApp() {
   const [calcDisplay, setCalcDisplay] = useState("0");
   const [calcPos, setCalcPos] = useState({ x: 320, y: 80 });
   const [calcSize, setCalcSize] = useState({ w: 310, h: 490 });
+  const [uiScale, setUiScale] = useState(1);
+  const ZOOM_MIN = 0.75;
+  const ZOOM_MAX = 1.5;
+  const ZOOM_STEP = 0.1;
+  const zoomIn = () => setUiScale(s => Math.min(ZOOM_MAX, Math.round((s + ZOOM_STEP) * 100) / 100));
+  const zoomOut = () => setUiScale(s => Math.max(ZOOM_MIN, Math.round((s - ZOOM_STEP) * 100) / 100));
+  const zoomReset = () => setUiScale(1);
   const dragRef  = useRef<{ ox: number; oy: number; px: number; py: number } | null>(null);
   const resizeRef = useRef<{ ox: number; oy: number; w: number; h: number } | null>(null);
 
@@ -274,7 +281,7 @@ export function MainApp() {
   const school = CALC_SCHOOLS.find(s => s.id === calcSchool) ?? CALC_SCHOOLS[0];
 
   return (
-    <div className={`relative flex h-screen font-sans overflow-hidden transition-colors duration-300 ${c.root}`}>
+    <div className={`relative flex h-screen font-sans overflow-hidden transition-colors duration-300 ${c.root}`} style={{ zoom: uiScale }}>
 
       {/* ══ LEFT SIDEBAR ══ */}
       <aside className={`flex-shrink-0 ${c.sidebar} border-r ${c.border} flex flex-col transition-all duration-300 ease-in-out overflow-hidden ${sidebarOpen ? "w-64" : "w-12"}`}>
@@ -389,6 +396,35 @@ export function MainApp() {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            {/* Text / UI size controls */}
+            <div className={`flex items-center gap-0.5 rounded-lg ${c.bgMuted} border ${c.border} p-0.5`} title="Adjust text and element size">
+              <button
+                onClick={zoomOut}
+                disabled={uiScale <= ZOOM_MIN + 0.001}
+                className={`w-7 h-7 flex items-center justify-center rounded-md ${c.textMuted} ${c.hoverMuted} transition-colors disabled:opacity-30 disabled:cursor-not-allowed`}
+                title="Decrease size"
+                aria-label="Decrease text and element size"
+              >
+                <ZoomOut className="w-3.5 h-3.5" />
+              </button>
+              <button
+                onClick={zoomReset}
+                className={`min-w-[40px] h-7 px-1.5 flex items-center justify-center rounded-md text-[11px] font-medium tabular-nums ${c.textMuted} ${c.hoverMuted} transition-colors`}
+                title="Reset to 100%"
+                aria-label="Reset text and element size to 100%"
+              >
+                {Math.round(uiScale * 100)}%
+              </button>
+              <button
+                onClick={zoomIn}
+                disabled={uiScale >= ZOOM_MAX - 0.001}
+                className={`w-7 h-7 flex items-center justify-center rounded-md ${c.textMuted} ${c.hoverMuted} transition-colors disabled:opacity-30 disabled:cursor-not-allowed`}
+                title="Increase size"
+                aria-label="Increase text and element size"
+              >
+                <ZoomIn className="w-3.5 h-3.5" />
+              </button>
+            </div>
             {/* Theme toggle */}
             <button
               onClick={() => setDarkMode(d => !d)}
