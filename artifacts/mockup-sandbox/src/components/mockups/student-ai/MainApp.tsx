@@ -277,7 +277,6 @@ export function MainApp() {
   const handleAvatarFile = (file: File | null) => {
     if (!file) return;
     if (!file.type.startsWith("image/")) return;
-    if (file.size > 2 * 1024 * 1024) return;
     const reader = new FileReader();
     reader.onload = () => setProfileDraft(d => ({ ...d, avatar: typeof reader.result === "string" ? reader.result : d.avatar }));
     reader.readAsDataURL(file);
@@ -991,7 +990,7 @@ export function MainApp() {
                 </div>
                 <div className="flex-1">
                   <p className={`text-xs font-medium ${c.textMd}`}>Profile photo</p>
-                  <p className={`text-[11px] mt-0.5 ${c.textFaint}`}>PNG or JPG, up to 2MB. Optional — your initials show otherwise.</p>
+                  <p className={`text-[11px] mt-0.5 ${c.textFaint}`}>Any image works. Optional — your initials show otherwise.</p>
                   {profileDraft.avatar && (
                     <button
                       onClick={() => setProfileDraft(d => ({ ...d, avatar: null }))}
