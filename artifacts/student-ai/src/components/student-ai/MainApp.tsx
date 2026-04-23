@@ -12,7 +12,7 @@ import {
   type ApiLLMStatus,
 } from "./api";
 import {
-  GraduationCap, Send, FileText, Image, BookOpen, Settings,
+  Send, FileText, Image, BookOpen, Settings,
   ChevronRight, Paperclip, MoreHorizontal, WifiOff, Download,
   MessageSquare, X, Plus, Mic, AudioLines, Layers,
   PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen,
@@ -23,6 +23,7 @@ import {
   User as UserIcon, Camera, Trash2, Pencil, Sparkles, Keyboard, Check,
   HardDrive, Usb, Phone, MessageCircle, Heart,
 } from "lucide-react";
+import { getGMT2Time, getGMT2DateTime, formatToGMT2 } from "../lib/utils";
 
 type UserProfile = { name: string; career: string; avatar: string | null };
 const PROFILE_STORAGE_KEY = "student-ai-user-profile";
@@ -373,15 +374,24 @@ export function MainApp() {
 
   const [currentDoc, setCurrentDoc] = useState<ApiDocument | null>(null);
   const [docGenerating, setDocGenerating] = useState(false);
+  const [headerTime, setHeaderTime] = useState(() => getGMT2DateTime());
 
-  const nowStamp = () =>
-    new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  const nowStamp = () => getGMT2Time();
 
   const reportError = (err: unknown) => {
     const msg = err instanceof Error ? err.message : String(err);
     setBackendError(msg);
     setBackendOnline(false);
   };
+
+  // Update header time every minute (GMT +2)
+  useEffect(() => {
+    setHeaderTime(getGMT2DateTime());
+    const interval = setInterval(() => {
+      setHeaderTime(getGMT2DateTime());
+    }, 60000); // Update every 60 seconds
+    return () => clearInterval(interval);
+  }, []);
 
   /* ── Load sessions / memory / documents on mount ── */
   const refreshSessions = useCallback(async () => {
@@ -1129,9 +1139,14 @@ export function MainApp() {
               ))}
             </div>
             <div className="mt-auto mb-1">
-              <div className={`w-7 h-7 flex items-center justify-center rounded-lg ${c.textGhost} transition-colors`}>
-                <Settings className="w-3.5 h-3.5" />
-              </div>
+              <button
+                onClick={() => setSidebarOpen(true)}
+                className={`w-7 h-7 flex items-center justify-center rounded-lg ${c.textGhost} hover:${c.bgMuted} transition-colors`}
+                title="Chat with us"
+                aria-label="Chat with us"
+              >
+                <MessageCircle className="w-3.5 h-3.5" />
+              </button>
             </div>
           </div>
         )}
@@ -1194,6 +1209,11 @@ export function MainApp() {
               className={`w-2 h-2 rounded-full ${backendOnline ? "bg-emerald-500" : "bg-amber-500 animate-pulse"}`}
               aria-label={backendOnline ? "Ready" : "Reconnecting"}
             />
+            {/* Current time (GMT +2 Lusaka, Zambia) */}
+            <div className={`text-[11px] flex flex-col items-end gap-0.5 px-2 py-1 rounded-lg ${c.bgMuted} border ${c.border}`} title={`${headerTime.day} · ${headerTime.date} (GMT +2)`}>
+              <span className={c.textMd}>{headerTime.time}</span>
+              <span className={`${c.textFaint} leading-none`}>GMT +2</span>
+            </div>
             {/* User profile button */}
             <button
               onClick={openProfile}
@@ -1326,8 +1346,8 @@ export function MainApp() {
             {isEmptyChat ? (
               /* ── WELCOME / FIRST-RUN SCREEN ── */
               <div className="flex flex-col items-center justify-center text-center py-16 px-4">
-                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center shadow-lg shadow-indigo-500/30 mb-5">
-                  <GraduationCap className="w-8 h-8 text-white" />
+                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center shadow-lg shadow-indigo-500/30 mb-5 overflow-hidden">
+                  <img src="/app-icons/MyGPT.png" alt="MyGPT" className="w-10 h-10 object-contain" />
                 </div>
                 <h2 className={`text-xl font-semibold ${c.text}`}>
                   {greeting.title}
@@ -1373,8 +1393,8 @@ export function MainApp() {
             {messages.map(msg => (
               <div key={msg.id} className={`flex gap-3 ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
                 {msg.role === "assistant" && (
-                  <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center flex-shrink-0 mt-0.5 shadow-md shadow-indigo-500/20">
-                    <GraduationCap className="w-3.5 h-3.5 text-white" />
+                  <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center flex-shrink-0 mt-0.5 shadow-md shadow-indigo-500/20 overflow-hidden">
+                    <img src="/app-icons/MyGPT.png" alt="MyGPT" className="w-4.5 h-4.5 object-contain" />
                   </div>
                 )}
                 <div className={`max-w-[75%] ${msg.role === "user" ? "order-first" : ""}`}>
@@ -1404,8 +1424,8 @@ export function MainApp() {
             {/* Document generation card (real generation via Python backend) */}
             {(docGenerating || currentDoc) && (
               <div className="flex gap-3 justify-start">
-                <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center flex-shrink-0 mt-0.5 shadow-md shadow-indigo-500/20">
-                  <GraduationCap className="w-3.5 h-3.5 text-white" />
+                <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center flex-shrink-0 mt-0.5 shadow-md shadow-indigo-500/20 overflow-hidden">
+                  <img src="/app-icons/MyGPT.png" alt="MyGPT" className="w-4.5 h-4.5 object-contain" />
                 </div>
                 <div className="flex-1 max-w-[85%]">
                   <div className={`rounded-2xl px-4 py-3 text-sm mb-3 leading-relaxed ${c.assistMsg}`}>
@@ -1503,8 +1523,8 @@ export function MainApp() {
             {/* Typing indicator (assistant is thinking) */}
             {isThinking && (
               <div className="flex gap-3 justify-start" role="status" aria-live="polite" aria-label="Assistant is thinking">
-                <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center flex-shrink-0 shadow-md shadow-indigo-500/20">
-                  <GraduationCap className="w-3.5 h-3.5 text-white" />
+                <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center flex-shrink-0 shadow-md shadow-indigo-500/20 overflow-hidden">
+                  <img src="/app-icons/MyGPT.png" alt="MyGPT" className="w-4.5 h-4.5 object-contain" />
                 </div>
                 <div className={`${c.card} border ${c.border} rounded-2xl rounded-tl-sm px-4 py-3`}>
                   <div className="flex gap-1 items-center h-4">
@@ -2475,8 +2495,8 @@ export function MainApp() {
             onClick={e => e.stopPropagation()}
           >
             <div className="px-6 pt-7 pb-5 text-center">
-              <div className="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center shadow-lg shadow-indigo-500/30 mb-4">
-                <GraduationCap className="w-8 h-8 text-white" />
+              <div className="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center shadow-lg shadow-indigo-500/30 mb-4 overflow-hidden">
+                <img src="/app-icons/MyGPT.png" alt="MyGPT" className="w-10 h-10 object-contain" />
               </div>
               <h2 className={`text-lg font-semibold ${c.text}`}>Welcome 👋</h2>
               <p className={`text-sm mt-2 ${c.textBody}`}>

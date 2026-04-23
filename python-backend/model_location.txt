@@ -19,6 +19,8 @@
 # If you leave this file as-is, the app looks for models inside its own
 # "models" subfolder.
 
+C:\dev\models
+
 # ADD YOUR MODEL PATH BELOW (uncomment and replace with your actual path):
 # E:\MyGPTModels
 

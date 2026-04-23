@@ -3,6 +3,8 @@
 // the Tauri app launches, and killed when the window closes.
 
 use std::time::Duration;
+use std::fs;
+use std::path::PathBuf;
 use tauri::AppHandle;
 use tauri_plugin_shell::process::CommandChild;
 use tauri_plugin_shell::ShellExt;
@@ -10,11 +12,33 @@ use tokio::time::sleep;
 
 const BACKEND_PORT: u16 = 8000;
 const OLLAMA_PORT: u16 = 11434;
-const PORTABLE_MODELS_DIR: &str = r"C:\dev\my-gpt\python-backend\models";
 
 const VISION_MODEL: &str = "qwen3.5:0.8b";
 const REASONING_MODEL: &str = "phi4-mini";
 const WRITER_MODEL: &str = "llama3.2:1b";
+
+fn get_models_dir() -> String {
+    // Try to read model_location.txt (same pattern as python backend)
+    let locations = vec![
+        PathBuf::from("model_location.txt"),
+        PathBuf::from("../python-backend/model_location.txt"),
+    ];
+    
+    for path in locations {
+        if let Ok(content) = fs::read_to_string(&path) {
+            for line in content.lines() {
+                let trimmed = line.trim();
+                // Skip comments and empty lines
+                if !trimmed.is_empty() && !trimmed.starts_with('#') {
+                    return trimmed.to_string();
+                }
+            }
+        }
+    }
+    
+    // Fallback to default
+    r"C:\dev\models".to_string()
+}
 
 pub struct BackendHandles {
     pub backend: Option<CommandChild>,
@@ -33,13 +57,16 @@ async fn start_ollama(app: &AppHandle) -> Option<CommandChild> {
         return None;
     }
 
+    let models_dir = get_models_dir();
+    eprintln!("[mygpt] using models directory: {}", models_dir);
+
     let cmd = app
         .shell()
         .command("ollama")
         .args(["serve"])
         .env("OLLAMA_MAX_LOADED_MODELS", "1")
         .env("OLLAMA_NUM_PARALLEL", "1")
-        .env("OLLAMA_MODELS", PORTABLE_MODELS_DIR);
+        .env("OLLAMA_MODELS", &models_dir);
 
     match cmd.spawn() {
         Ok((_rx, child)) => {
