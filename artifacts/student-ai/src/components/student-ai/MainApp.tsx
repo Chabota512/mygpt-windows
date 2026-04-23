@@ -461,11 +461,16 @@ export function MainApp() {
     const userMsg: Message = {
       id: Date.now(), role: "user", content: trimmed, timestamp: nowStamp(),
     };
+    const wasFirstMessage = isEmptyChat;
     setMessages(prev => [...prev, userMsg]);
     setInput("");
     setIsEmptyChat(false);
     setIsThinking(true);
     setBackendError(null);
+    if (wasFirstMessage) {
+      setSidebarOpen(false);
+      setRightOpen(false);
+    }
 
     try {
       const data = await api.chat(trimmed, currentSessionId);
