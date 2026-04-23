@@ -32,10 +32,12 @@ fn restart_ollama_command(state: tauri::State<'_, AppState>, app: tauri::AppHand
             tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
             // Start Ollama first (without holding the lock)
             let child = backend::start_ollama(&app_clone).await;
+            let child_started = child.is_some();
             
             // Update state with the child
             {
-                let mut state_guard = app_clone.state::<AppState>().backend.lock().unwrap();
+                let state = app_clone.state::<AppState>();
+                let mut state_guard = state.backend.lock().unwrap();
                 if let Some(handles) = &mut *state_guard {
                     if let Some(child) = child {
                         handles.ollama = Some(child);
@@ -46,7 +48,7 @@ fn restart_ollama_command(state: tauri::State<'_, AppState>, app: tauri::AppHand
             }
             
             // Check if Ollama is running (outside of lock)
-            if child.is_none() {
+            if !child_started {
                 if !(tokio::net::TcpStream::connect(("127.0.0.1", 11434)).await.is_ok()) {
                     eprintln!("[mygpt] failed to restart ollama");
                 } else {
