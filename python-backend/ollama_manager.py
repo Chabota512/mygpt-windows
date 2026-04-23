@@ -137,25 +137,31 @@ def start_server(model_dir: Path) -> bool:
         if not exe:
             print(
                 "[OllamaManager] ERROR: ollama.exe not found.\n"
-                "  - Expected at: {model_dir}/ollama.exe\n"
+                f"  - Expected at: {model_dir}/ollama.exe\n"
                 "  - Or in PATH\n"
                 "  - Download from https://ollama.com"
             )
             return False
         
-        # Set up environment
+        # Set up environment for Windows
         env = os.environ.copy()
         env["OLLAMA_MAX_LOADED_MODELS"] = "1"  # RAM guard
-        env["OLLAMA_MODELS"] = str(model_dir)
+        # Use absolute path and convert to Windows format
+        models_path = str(model_dir.resolve())
+        env["OLLAMA_MODELS"] = models_path
         
         try:
-            print(f"[OllamaManager] Starting Ollama server…")
+            print(f"[OllamaManager] Starting Ollama server from: {exe}")
+            print(f"[OllamaManager] OLLAMA_MODELS={models_path}")
+            print(f"[OllamaManager] OLLAMA_MAX_LOADED_MODELS=1")
+            
             _ollama_proc = subprocess.Popen(
-                [str(exe), "serve"],
+                [str(exe.resolve()), "serve"],
                 env=env,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, "CREATE_NO_WINDOW") else 0,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                creationflags=subprocess.CREATE_NEW_CONSOLE,
             )
             print(f"[OllamaManager] Ollama process started (PID {_ollama_proc.pid})")
             

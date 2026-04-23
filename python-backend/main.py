@@ -42,6 +42,7 @@ from ollama_manager import (
     ensure_server_running,
     set_model_dir,
     set_ollama_host,
+    is_server_running,
 )
 
 
@@ -429,18 +430,46 @@ OLLAMA_DEBATE_ROUNDS  = max(0, int(os.environ.get("OLLAMA_DEBATE_ROUNDS", "1")))
 
 # ── Detect available models and set up fallbacks ──
 def _scan_local_models() -> set[str]:
-    """Scan the local model directory for model files."""
+    """
+    Scan the local model directory for model files and Ollama manifests.
+    
+    Ollama stores models in two ways:
+    1. Blobs (binary files) - in MODEL_DIR/models/blobs/
+    2. Manifests (metadata) - in MODEL_DIR/models/manifests/registry.ollama.ai/library/
+    
+    We scan for manifest directories which indicate installed models.
+    """
     model_names = set()
-    model_extensions = {'.gguf', '.bin', '.safetensors', '.pt', '.pth', '.keras', '.pb'}
     
     try:
+        # Strategy 1: Look for Ollama manifests (most reliable for Ollama-managed models)
+        # Pattern: MODEL_DIR/models/manifests/registry.ollama.ai/library/<model>/<tag>
+        manifests_dir = MODEL_DIR / "models" / "manifests" / "registry.ollama.ai" / "library"
+        if manifests_dir.exists():
+            for model_dir_entry in manifests_dir.iterdir():
+                if model_dir_entry.is_dir():
+                    model_name = model_dir_entry.name
+                    # Check if this model has tags
+                    for tag_entry in model_dir_entry.iterdir():
+                        if tag_entry.is_file():
+                            # Found a tag manifest file
+                            model_names.add(f"{model_name}:{tag_entry.name}")
+                            break
+                    else:
+                        # No tag files found, just add the model name
+                        if model_name not in model_names:
+                            model_names.add(model_name)
+        
+        # Strategy 2: Look for raw model files (.gguf, etc.) as fallback
+        model_extensions = {'.gguf', '.bin', '.safetensors', '.pt', '.pth', '.keras', '.pb'}
         if MODEL_DIR.exists():
             for file_path in MODEL_DIR.rglob("*"):
                 if file_path.is_file() and file_path.suffix.lower() in model_extensions:
                     # Use filename without extension as model name
                     model_names.add(file_path.stem)
-    except Exception:
-        pass
+    
+    except Exception as e:
+        print(f"[models] Error scanning local models: {e}")
     
     return model_names
 
@@ -1545,6 +1574,32 @@ def get_llm_status():
         online=online,
         available_models=available_models,
     )
+
+
+@app.post("/llm-restart", response_model=LLMStatus)
+def restart_ollama():
+    """
+    Restart (or start) the Ollama server.
+    
+    Called when user clicks the "Restart" button in the UI.
+    Attempts to start the Ollama server and pre-load the Writer model.
+    """
+    print("[llm-restart] User clicked Restart button")
+    success = ensure_server_running(MODEL_DIR)
+    
+    if success:
+        print("[llm-restart] Ollama server is now running")
+        # Try to pre-load the writer model
+        try:
+            specialist_router.ensure_writer_loaded()
+            print("[llm-restart] Writer model pre-loaded")
+        except Exception as e:
+            print(f"[llm-restart] Warning: could not pre-load writer model: {e}")
+    else:
+        print("[llm-restart] Failed to start Ollama server")
+    
+    # Return updated status
+    return get_llm_status()
 
 
 # ──────────────────────────────────────────────────────────────────────
