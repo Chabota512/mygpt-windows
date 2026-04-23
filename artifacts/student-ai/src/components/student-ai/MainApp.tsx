@@ -45,12 +45,12 @@ type Message = { id: number; role: "user" | "assistant"; content: string; timest
 type Attachment = { name: string; kind: "image" | "pdf" | "doc"; id?: string };
 
 const CALC_SCHOOLS = [
-  { id: "engineering", label: "Engineering", short: "Sci", icon: FlaskConical, color: "text-indigo-500", rows: [["sin","cos","tan","π"],["log","ln","√","x²"],["(",")","%","÷"],["7","8","9","×"],["4","5","6","−"],["1","2","3","+"],["±","0",".","="]] },
-  { id: "business",    label: "Business",    short: "Fin", icon: TrendingUp,   color: "text-emerald-600", rows: [["PV","FV","PMT","n"],["i%","NPV","IRR","%"],["(",")",  "CE","÷"],["7","8","9","×"],["4","5","6","−"],["1","2","3","+"],["±","0",".","="]] },
-  { id: "humanities",  label: "Humanities",  short: "Std", icon: BookOpen,     color: "text-amber-600",  rows: [["Day↔","Yr↔","°C↔F","%"],["(",")",  "CE","÷"],["7","8","9","×"],["4","5","6","−"],["1","2","3","+"],["±","0",".","="]] },
-  { id: "law",         label: "Law",         short: "Leg", icon: Scale,        color: "text-violet-600", rows: [["hr×$","days","VAT","%"],["(",")",  "CE","÷"],["7","8","9","×"],["4","5","6","−"],["1","2","3","+"],["±","0",".","="]] },
-  { id: "medicine",    label: "Medicine",    short: "Med", icon: Stethoscope,  color: "text-rose-600",   rows: [["mg/kg","BSA","BMI","CrCl"],["(",")",  "CE","÷"],["7","8","9","×"],["4","5","6","−"],["1","2","3","+"],["±","0",".","="]] },
-  { id: "statistics",  label: "Statistics",  short: "Stat",icon: BarChart2,    color: "text-cyan-600",   rows: [["σ","μ","r²","P(x)"],["∑","n!","Cₙᵣ","%"],["(",")",  "CE","÷"],["7","8","9","×"],["4","5","6","−"],["1","2","3","+"],["±","0",".","="]] },
+  { id: "engineering", label: "Engineering", short: "Sci", icon: FlaskConical, color: "text-indigo-500", rows: [["sin","cos","tan","π"],["log","ln","√","x²"],["x³","e","sinh","cosh"],["asin","acos","atan","DEL"],["(",")","%","÷"],["7","8","9","×"],["4","5","6","−"],["1","2","3","+"],["0",".","C","="]] },
+  { id: "business",    label: "Business",    short: "Fin", icon: TrendingUp,   color: "text-emerald-600", rows: [["PV","FV","PMT","n"],["i%","NPV","IRR","R²"],["PV-PF","AV-PF","Tax","Profit"],["PV(n)","FV(n)","PMT(n)","DEL"],["(",")","%","÷"],["7","8","9","×"],["4","5","6","−"],["1","2","3","+"],["0",".","C","="]] },
+  { id: "humanities",  label: "Humanities",  short: "Std", icon: BookOpen,     color: "text-amber-600",  rows: [["Day↔","Yr↔","°C↔F","Kelvin"],["Weekday","LeapYr","Timestamp","Epoch"],["Avg","Sum","SD","Median"],["ASCII","Char","UTF","Hash"],["(",")","%","÷"],["7","8","9","×"],["4","5","6","−"],["1","2","3","+"],["0",".","C","="]] },
+  { id: "law",         label: "Law",         short: "Leg", icon: Scale,        color: "text-violet-600", rows: [["hr×$","days","weeks","months"],["years","VAT","Tax%","Discount"],["Interest","Penalty","Principal","Rate"],["Fine","Fee","Cost","Total"],["(",")","%","÷"],["7","8","9","×"],["4","5","6","−"],["1","2","3","+"],["0",".","C","="]] },
+  { id: "medicine",    label: "Medicine",    short: "Med", icon: Stethoscope,  color: "text-rose-600",   rows: [["mg/kg","BSA","BMI","CrCl"],["eGFR","A1C","LDL","BP-MAP"],["HR","RR","temp","O₂sat"],["Age","Weight","Height","DEL"],["(",")","%","÷"],["7","8","9","×"],["4","5","6","−"],["1","2","3","+"],["0",".","C","="]] },
+  { id: "statistics",  label: "Statistics",  short: "Stat",icon: BarChart2,    color: "text-cyan-600",   rows: [["σ","μ","r²","P(x)"],["∑","n!","Cₙᵣ","Pₙᵣ"],["χ²","t-test","Z-score","Median"],["Mode","Range","IQR","Std","Mode"],["(",")","%","÷"],["7","8","9","×"],["4","5","6","−"],["1","2","3","+"],["0",".","C","="]] },
 ];
 
 type Session = { id: string; label: string; time: string };
@@ -249,6 +249,7 @@ export function MainApp() {
   const [calcDisplay, setCalcDisplay] = useState("0");
   const [calcPos, setCalcPos] = useState({ x: 320, y: 80 });
   const [calcSize, setCalcSize] = useState({ w: 310, h: 490 });
+  const [calcMinimized, setCalcMinimized] = useState(false);
   const [uiScale, setUiScale] = useState(0.9);
 
   /* User profile */
@@ -824,6 +825,28 @@ export function MainApp() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [profileOpen, settingsOpen, shortcutsOpen, pendingDeleteId, editingSessionId]);
+
+  // Calculator keyboard support
+  useEffect(() => {
+    if (activeTool !== "Calculator") return;
+    const onKey = (e: KeyboardEvent) => {
+      const keyMap: Record<string, string> = {
+        "*": "×", "/": "÷", "-": "−", "+": "+", "=": "=", "Enter": "=",
+        "Backspace": "DEL", "Delete": "DEL", "c": "C", "C": "C",
+        "0": "0", "1": "1", "2": "2", "3": "3", "4": "4",
+        "5": "5", "6": "6", "7": "7", "8": "8", "9": "9",
+        ".": ".", "%": "%", "(": "(", ")": ")"
+      };
+      const key = keyMap[e.key];
+      if (key) {
+        e.preventDefault();
+        onCalcKey(key);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [activeTool]);
+
   const dragRef  = useRef<{ ox: number; oy: number; px: number; py: number } | null>(null);
   const resizeRef = useRef<{ ox: number; oy: number; w: number; h: number } | null>(null);
 
@@ -846,23 +869,32 @@ export function MainApp() {
   }
 
   function onCalcKey(key: string) {
-    const specials = ["sin","cos","tan","π","log","ln","√","x²","PV","FV","PMT","n","i%","NPV","IRR","σ","μ","r²","P(x)","∑","n!","Cₙᵣ","mg/kg","BSA","BMI","CrCl","hr×$","days","VAT","Day↔","Yr↔","°C↔F"];
+    const specials = ["sin","cos","tan","π","log","ln","√","x²","x³","e","sinh","cosh","asin","acos","atan","PV","FV","PMT","n","i%","NPV","IRR","R²","σ","μ","r²","P(x)","∑","n!","Cₙᵣ","Pₙᵣ","mg/kg","BSA","BMI","CrCl","eGFR","A1C","LDL","BP-MAP","HR","RR","temp","O₂sat","Age","Weight","Height","Day↔","Yr↔","°C↔F","Kelvin","Weekday","LeapYr","Timestamp","Epoch","Avg","Sum","SD","Median","ASCII","Char","UTF","Hash","hr×$","days","weeks","months","years","VAT","Tax%","Discount","Interest","Penalty","Principal","Rate","Fine","Fee","Cost","Total","PV-PF","AV-PF","Tax","Profit","PV(n)","FV(n)","PMT(n)","χ²","t-test","Z-score"];
     if (key === "=") {
       try {
-        const r = Function('"use strict";return(' + calcDisplay.replace(/×/g,"*").replace(/÷/g,"/").replace(/−/g,"-") + ")")();
+        let expr = calcDisplay.replace(/×/g,"*").replace(/÷/g,"/").replace(/−/g,"-");
+        // Handle special math constants
+        expr = expr.replace(/π/g, String(Math.PI)).replace(/e/g, String(Math.E));
+        // Safe evaluation
+        const r = Function('"use strict";return(' + expr + ")")();
         setCalcDisplay(String(parseFloat(r.toFixed(10))));
       } catch { setCalcDisplay("Error"); }
-    } else if (key === "CE") { setCalcDisplay("0");
-    } else if (key === "±") { setCalcDisplay(d => d.startsWith("-") ? d.slice(1) : "-" + d);
-    } else if (specials.includes(key)) { setCalcDisplay(key + "(");
-    } else { setCalcDisplay(d => d === "0" || d === "Error" ? key : d + key); }
+    } else if (key === "C") { 
+      setCalcDisplay("0");
+    } else if (key === "DEL") { 
+      setCalcDisplay(d => d.length <= 1 ? "0" : d.slice(0, -1));
+    } else if (specials.includes(key)) { 
+      setCalcDisplay(d => d === "0" ? key + "(" : d + key + "(");
+    } else { 
+      setCalcDisplay(d => d === "0" || d === "Error" ? key : d + key); 
+    }
   }
 
   function keyClass(key: string) {
-    if (key === "=") return `col-span-1 ${c.keyEq} font-bold rounded-xl text-sm transition-colors`;
+    if (key === "=") return `${c.keyEq} font-bold rounded-xl text-sm transition-colors`;
     if (["+","−","×","÷"].includes(key)) return `${c.keyOp} font-semibold rounded-xl text-sm transition-colors`;
-    if (["CE","±","%"].includes(key)) return `${c.keySp} rounded-xl text-xs transition-colors`;
-    const sp = ["sin","cos","tan","π","log","ln","√","x²","PV","FV","PMT","n","i%","NPV","IRR","σ","μ","r²","P(x)","∑","n!","Cₙᵣ","mg/kg","BSA","BMI","CrCl","hr×$","days","VAT","Day↔","Yr↔","°C↔F"];
+    if (["C","DEL","%"].includes(key)) return `${c.keySp} rounded-xl text-xs transition-colors`;
+    const sp = ["sin","cos","tan","π","log","ln","√","x²","x³","e","sinh","cosh","asin","acos","atan","PV","FV","PMT","n","i%","NPV","IRR","R²","σ","μ","r²","P(x)","∑","n!","Cₙᵣ","Pₙᵣ","mg/kg","BSA","BMI","CrCl","eGFR","A1C","LDL","BP-MAP","HR","RR","temp","O₂sat","Age","Weight","Height","Day↔","Yr↔","°C↔F","Kelvin","Weekday","LeapYr","Timestamp","Epoch","Avg","Sum","SD","Median","ASCII","Char","UTF","Hash","hr×$","days","weeks","months","years","VAT","Tax%","Discount","Interest","Penalty","Principal","Rate","Fine","Fee","Cost","Total","PV-PF","AV-PF","Tax","Profit","PV(n)","FV(n)","PMT(n)","χ²","t-test","Z-score"];
     if (sp.includes(key)) return `${c.keyFn} rounded-xl text-[10px] font-medium transition-colors`;
     return `${c.keyNum} rounded-xl text-sm transition-colors`;
   }
@@ -1722,7 +1754,7 @@ export function MainApp() {
       {activeTool === "Calculator" && (
         <div
           className={`absolute z-50 rounded-2xl ${c.calcBg} border ${c.borderMd} shadow-2xl shadow-black/20 flex flex-col overflow-hidden select-none`}
-          style={{ left: calcPos.x, top: calcPos.y, width: calcSize.w, height: calcSize.h }}
+          style={{ left: calcPos.x, top: calcPos.y, width: calcSize.w, height: calcMinimized ? "auto" : calcSize.h }}
         >
           <div className={`flex items-center justify-between px-3 py-2.5 border-b ${c.border} ${c.calcHeader} cursor-grab active:cursor-grabbing`} onMouseDown={startDrag}>
             <div className="flex items-center gap-2">
@@ -1731,11 +1763,13 @@ export function MainApp() {
               <span className={`text-[10px] font-medium ${school.color} opacity-80`}>· {school.label}</span>
             </div>
             <div className="flex items-center gap-1">
-              <button onClick={() => setCalcDisplay("0")} className={`w-6 h-6 flex items-center justify-center rounded-md ${c.textGhost} ${c.hoverMuted} transition-colors`}><Minimize2 className="w-3 h-3" /></button>
+              <button onClick={() => setCalcMinimized(!calcMinimized)} className={`w-6 h-6 flex items-center justify-center rounded-md ${c.textGhost} ${c.hoverMuted} transition-colors`} title={calcMinimized ? "Restore" : "Minimize"}><Minimize2 className="w-3 h-3" /></button>
               <button onClick={() => setActiveTool(null)} className={`w-6 h-6 flex items-center justify-center rounded-md ${c.textGhost} ${c.hoverMuted} transition-colors`}><X className="w-3 h-3" /></button>
             </div>
           </div>
 
+          {!calcMinimized && (
+            <>
           {/* School tabs */}
           <div className={`flex gap-1 px-2 py-2 border-b ${c.border} overflow-x-auto`}>
             {CALC_SCHOOLS.map(s => (
@@ -1774,6 +1808,8 @@ export function MainApp() {
               <path d="M8 4 L8 8 L4 8" stroke="currentColor" strokeWidth="1.5" fill="none" />
             </svg>
           </div>
+            </>
+          )}
         </div>
       )}
 
