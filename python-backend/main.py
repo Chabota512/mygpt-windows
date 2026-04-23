@@ -367,6 +367,37 @@ OLLAMA_NUM_CTX        = int(os.environ.get("OLLAMA_NUM_CTX", "4096"))
 # all done while the reasoning model is still in RAM — no extra swap cost).
 OLLAMA_DEBATE_ROUNDS  = max(0, int(os.environ.get("OLLAMA_DEBATE_ROUNDS", "1")))
 
+# ── Detect available models and set up fallbacks ──
+def _get_available_models() -> set[str]:
+    """Query Ollama for list of available models."""
+    try:
+        import ollama
+        client = ollama.Client(host=OLLAMA_HOST)
+        models = client.list()
+        return {m.model.split(":")[0] for m in models.models} if models.models else set()
+    except Exception:
+        return set()
+
+def _resolve_model_for_role(preferred: str, available_models: set[str], fallback: str) -> str:
+    """
+    Resolve which model to use for a specific role.
+    - If preferred model is available, use it
+    - If available_models has exactly one model, use that (fallback to single model)
+    - Otherwise use the provided fallback
+    """
+    model_base = preferred.split(":")[0]
+    if model_base in available_models:
+        return preferred
+    if len(available_models) == 1:
+        # Single model mode: use the only available model for all roles
+        return list(available_models)[0]
+    return fallback
+
+_AVAILABLE_MODELS = _get_available_models()
+_RESOLVED_VISION_MODEL = _resolve_model_for_role(OLLAMA_VISION_MODEL, _AVAILABLE_MODELS, OLLAMA_VISION_MODEL)
+_RESOLVED_REASONING_MODEL = _resolve_model_for_role(OLLAMA_REASONING_MODEL, _AVAILABLE_MODELS, OLLAMA_REASONING_MODEL)
+_RESOLVED_WRITER_MODEL = _resolve_model_for_role(OLLAMA_WRITER_MODEL, _AVAILABLE_MODELS, OLLAMA_WRITER_MODEL)
+
 _REASONING_HINTS = re.compile(
     r"(?ix)"
     r"(?:^|\b)("
@@ -549,9 +580,9 @@ def _route_task(
         # ── Step 1 · Vision (only if an image is attached) ─────────
         vision_desc = ""
         if image_paths:
-            stages.append(f"Analyzing image with {OLLAMA_VISION_MODEL}…")
+            stages.append(f"Analyzing image with {_RESOLVED_VISION_MODEL}…")
             vision_desc = _ollama_chat(
-                OLLAMA_VISION_MODEL,
+                _RESOLVED_VISION_MODEL,
                 [
                     {
                         "role": "system",
@@ -571,7 +602,7 @@ def _route_task(
         use_reasoning = _is_reasoning_task(message) or bool(vision_desc)
         reasoning_out = ""
         if use_reasoning:
-            stages.append(f"Drafting answer with {OLLAMA_REASONING_MODEL}…")
+            stages.append(f"Drafting answer with {_RESOLVED_REASONING_MODEL}…")
             user_block = message
             if vision_desc:
                 user_block = (
@@ -589,7 +620,7 @@ def _route_task(
         # the reasoning specialist for one more pass. This is the cross-model
         # conversation: writer ↔ reasoning, capped at 1 bounce so we don't
         # thrash the RAM.
-        stages.append(f"Formatting with {OLLAMA_WRITER_MODEL}…")
+        stages.append(f"Formatting with {_RESOLVED_WRITER_MODEL}…")
         if reasoning_out:
             writer_system = (
                 "You are an academic writing assistant. Take the draft below "
@@ -618,7 +649,7 @@ def _route_task(
                 {"role": "user", "content": message},
             ]
 
-        final = _ollama_chat(OLLAMA_WRITER_MODEL, writer_msgs)
+        final = _ollama_chat(_RESOLVED_WRITER_MODEL, writer_msgs)
 
         # ── Step 4 · Optional bounce-back if writer asked for clarity ──
         if (
@@ -628,7 +659,7 @@ def _route_task(
             feedback = final.split("\n", 1)[1].strip() if "\n" in final else "Make it clearer and more complete."
             stages.append("Writer asked for clarity — sending back to reasoning…")
             reasoning_out = _ollama_chat(
-                OLLAMA_REASONING_MODEL,
+                _RESOLVED_REASONING_MODEL,
                 base_history + [
                     {
                         "role": "system",
@@ -647,9 +678,9 @@ def _route_task(
                     },
                 ],
             )
-            stages.append(f"Re-formatting with {OLLAMA_WRITER_MODEL}…")
+            stages.append(f"Re-formatting with {_RESOLVED_WRITER_MODEL}…")
             final = _ollama_chat(
-                OLLAMA_WRITER_MODEL,
+                _RESOLVED_WRITER_MODEL,
                 base_history + [
                     {
                         "role": "system",
@@ -667,15 +698,17 @@ def _route_task(
         if not final:
             # Writer produced nothing — fall back to the upstream output
             final = reasoning_out or vision_desc or "(no response)"
-        return final, stages, OLLAMA_WRITER_MODEL
+        return final, stages, _RESOLVED_WRITER_MODEL
 
     except Exception as e:
         print(f"[router] Ollama call failed: {e}")
         # Graceful fallback so the UI never crashes
+        available = ", ".join(sorted(_AVAILABLE_MODELS)) if _AVAILABLE_MODELS else "none"
         return (
             "I couldn't reach the local AI just now.\n\n"
             f"• Make sure Ollama is running (`ollama serve`).\n"
-            f"• Make sure you've pulled: `{OLLAMA_VISION_MODEL}`, "
+            f"• Available models: {available}\n"
+            f"• Default models needed: `{OLLAMA_VISION_MODEL}`, "
             f"`{OLLAMA_REASONING_MODEL}`, `{OLLAMA_WRITER_MODEL}`.\n"
             f"• Technical detail: {e}",
             stages + ["Failed — see message"],
