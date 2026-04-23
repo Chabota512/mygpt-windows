@@ -798,7 +798,15 @@ export function MainApp() {
   const school = CALC_SCHOOLS.find(s => s.id === calcSchool) ?? CALC_SCHOOLS[0];
 
   return (
-    <div className={`student-ai-root relative flex h-screen font-sans overflow-hidden transition-colors duration-300 ${c.root}`} style={{ zoom: uiScale }}>
+    <div
+      className={`student-ai-root relative flex font-sans overflow-hidden transition-colors duration-300 ${c.root}`}
+      style={{
+        transform: `scale(${uiScale})`,
+        transformOrigin: "top left",
+        width: `${100 / uiScale}vw`,
+        height: `${100 / uiScale}vh`,
+      }}
+    >
 
       {/* ══ LEFT SIDEBAR ══ */}
       <aside className={`flex-shrink-0 ${c.sidebar} border-r ${c.border} flex flex-col transition-all duration-300 ease-in-out overflow-hidden ${sidebarOpen ? "w-64" : "w-12"}`}>
