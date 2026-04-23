@@ -1454,6 +1454,6 @@ if __name__ == "__main__":
     # we're running frozen.
     is_frozen = getattr(sys, "frozen", False)
     if is_frozen:
-        uvicorn.run(app, host=host, port=port, log_level="info")
+        uvicorn.run(app, host=host, port=port, log_level="info", use_colors=False)
     else:
         uvicorn.run("main:app", host=host, port=port, reload=True)
