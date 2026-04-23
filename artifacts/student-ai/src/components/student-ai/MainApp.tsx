@@ -900,6 +900,26 @@ export function MainApp() {
                   );
                 })}
               </div>
+
+              <p className={`text-[10px] uppercase tracking-widest font-semibold px-2 mt-5 mb-2 ${c.textFaint}`}>Documents</p>
+              <div className="space-y-0.5">
+                {documents.length === 0 && (
+                  <p className={`text-[11px] px-3 py-2 ${c.textFaint}`}>
+                    None yet — use <span className="font-medium">Write Doc</span> to create one.
+                  </p>
+                )}
+                {documents.map(doc => (
+                  <a key={doc.id}
+                     href={api.url(doc.download_url)}
+                     download
+                     title={`Download ${doc.title}`}
+                     className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left transition-all ${c.textMuted} ${c.hoverSub}`}>
+                    <FileText className="w-3.5 h-3.5 flex-shrink-0 text-emerald-500" />
+                    <span className={`text-xs flex-1 truncate ${c.textBody}`}>{doc.title}</span>
+                    <span className={`text-[10px] ${c.textXs} uppercase`}>{doc.format}</span>
+                  </a>
+                ))}
+              </div>
             </div>
 
             <div className={`px-4 py-3 border-t ${c.border}`}>
@@ -1020,16 +1040,6 @@ export function MainApp() {
             )}
           </div>
         </header>
-
-        {/* Tabs */}
-        <div className={`flex border-b ${c.border} ${c.tabBg} px-6`}>
-          {[{ id:"chat", icon: MessageSquare, label:"Chat" }, { id:"memory", icon: BookOpen, label:"Memory" }, { id:"docs", icon: FileText, label:"Documents" }].map(t => (
-            <button key={t.id} onClick={() => setActiveTab(t.id as typeof activeTab)}
-              className={`flex items-center gap-1.5 px-4 py-2.5 text-xs font-medium border-b-2 transition-all ${activeTab === t.id ? c.tabActive : c.tabInactive}`}>
-              <t.icon className="w-3.5 h-3.5" />{t.label}
-            </button>
-          ))}
-        </div>
 
         {/* ── SEARCH NOTES RESULTS ── */}
         {activeTool === "Search Notes" ? (
@@ -1448,7 +1458,7 @@ export function MainApp() {
       </main>
 
       {/* ══ RIGHT PANEL ══ */}
-      <aside className={`flex-shrink-0 ${c.panel} border-l ${c.border} flex flex-col transition-all duration-300 ease-in-out overflow-hidden ${rightOpen ? "w-72" : "w-12"}`}>
+      <aside className={`flex-shrink-0 ${c.panel} border-l ${c.border} flex flex-col transition-all duration-300 ease-in-out overflow-hidden ${rightOpen ? "w-56" : "w-12"}`}>
         {rightOpen ? (
           <>
             <div className={`px-4 py-4 border-b ${c.border} flex items-center justify-between`}>
