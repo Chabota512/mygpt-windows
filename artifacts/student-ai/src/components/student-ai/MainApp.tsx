@@ -879,9 +879,7 @@ export function MainApp() {
           <>
             <div className={`px-4 py-4 border-b ${c.border} flex items-center justify-between`}>
               <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center shadow-lg shadow-indigo-500/20 flex-shrink-0">
-                  <GraduationCap className="w-4 h-4 text-white" />
-                </div>
+                <img src="/logo.png" alt="MyGPT" className="w-8 h-8 rounded-lg flex-shrink-0 shadow-lg shadow-indigo-500/20" />
                 <div>
                   <p className={`text-sm tracking-tight whitespace-nowrap ${c.text}`}>
                     <span className="font-bold">MyGPT</span>
@@ -1052,9 +1050,7 @@ export function MainApp() {
               <PanelLeftOpen className="w-4 h-4" />
             </button>
             <div className={`w-6 h-px ${c.dot} rounded`} />
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center shadow-md shadow-indigo-500/20">
-              <GraduationCap className="w-3.5 h-3.5 text-white" />
-            </div>
+            <img src="/logo.png" alt="MyGPT" className="w-8 h-8 rounded-lg shadow-md shadow-indigo-500/20" />
             <div className={`w-6 h-px ${c.dot} rounded`} />
             <div className="flex flex-col items-center gap-2">
               {sessions.slice(0, 3).map(s => (
