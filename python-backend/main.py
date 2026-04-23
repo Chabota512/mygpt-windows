@@ -1230,6 +1230,36 @@ def model_storage():
     )
 
 
+class CustomPathRequest(BaseModel):
+    path: str
+
+
+@app.post("/model-storage/custom-path", response_model=ModelInfo)
+def set_custom_model_path(request: CustomPathRequest):
+    """Update the custom model path and save it to model_location.txt"""
+    global MODEL_DIR
+    
+    path = request.path.strip()
+    if not path:
+        # If empty, clear the custom path
+        MODEL_LOCATION_FILE.write_text("", "utf-8")
+        MODEL_DIR = resolve_model_dir()
+    else:
+        # Validate and normalize the path
+        try:
+            new_path = Path(path).expanduser().resolve()
+            # Create the directory if it doesn't exist
+            new_path.mkdir(parents=True, exist_ok=True)
+            # Write the path to model_location.txt
+            MODEL_LOCATION_FILE.write_text(path, "utf-8")
+            MODEL_DIR = new_path
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Invalid path: {str(e)}")
+    
+    # Return updated model storage info
+    return model_storage()
+
+
 # ──────────────────────────────────────────────────────────────────────
 # LLM Configuration (persisted to disk so it survives restarts)
 # ──────────────────────────────────────────────────────────────────────
