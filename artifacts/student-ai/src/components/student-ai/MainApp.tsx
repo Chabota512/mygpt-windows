@@ -19,7 +19,7 @@ import {
   FlaskConical, TrendingUp, Scale, Stethoscope, BarChart2,
   GripHorizontal, Minimize2, Sun, Moon, ZoomIn, ZoomOut,
   User as UserIcon, Camera, Trash2, Pencil, Sparkles, Keyboard, Check,
-  HardDrive, Usb,
+  HardDrive, Usb, Phone, MessageCircle, Heart,
 } from "lucide-react";
 
 type UserProfile = { name: string; career: string; avatar: string | null };
@@ -627,6 +627,7 @@ export function MainApp() {
 
   /* Settings & shortcuts help */
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [contactOpen, setContactOpen] = useState(false);
   const [storage, setStorage] = useState<ApiStorageInfo | null>(null);
   const [storageLoading, setStorageLoading] = useState(false);
   const [modelStorage, setModelStorage] = useState<ApiModelStorageInfo | null>(null);
@@ -977,9 +978,15 @@ export function MainApp() {
               </div>
             </div>
 
-            <button className={`flex items-center gap-2.5 px-5 py-3 border-t ${c.border} ${c.textMuted} ${c.hoverMuted} transition-colors text-xs`}>
-              <Settings className="w-3.5 h-3.5" />Settings
-            </button>
+            <div className={`flex items-center justify-between gap-2 px-5 py-3 border-t ${c.border}`}>
+              <span className={`text-[10px] ${c.textGhost} truncate`}>© {new Date().getFullYear()} Bluegold.ltd</span>
+              <button
+                onClick={() => setContactOpen(true)}
+                className={`text-[10px] font-medium text-indigo-500 hover:text-indigo-400 transition-colors`}
+              >
+                Contact us
+              </button>
+            </div>
           </>
         ) : (
           <div className="flex flex-col items-center py-3 gap-3 h-full cursor-pointer group" onClick={() => setSidebarOpen(true)}>
@@ -1704,6 +1711,86 @@ export function MainApp() {
           border-radius: 6px;
         }
       `}</style>
+
+      {/* ══ CONTACT US MODAL ══ */}
+      {contactOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+          onClick={() => setContactOpen(false)}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Contact us"
+        >
+          <div
+            className={`w-full max-w-md rounded-2xl border ${c.borderMd} ${c.card} shadow-2xl overflow-hidden`}
+            onClick={e => e.stopPropagation()}
+          >
+            <div className={`px-6 pt-6 pb-4 text-center border-b ${c.border}`}>
+              <div className="w-12 h-12 mx-auto mb-3 rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center shadow-lg shadow-indigo-500/30">
+                <Heart className="w-5 h-5 text-white" />
+              </div>
+              <h2 className={`text-base font-semibold ${c.text}`}>Thank you for trusting us</h2>
+              <p className={`text-xs mt-1.5 ${c.textMuted} leading-relaxed`}>
+                We're truly grateful you chose My_GPT 4 Students. If you ever need help, have feedback, or just want to say hello — we'd love to hear from you.
+              </p>
+            </div>
+
+            <div className="px-6 py-5 space-y-3">
+              <a
+                href="https://wa.me/260965335385"
+                target="_blank"
+                rel="noopener noreferrer"
+                className={`flex items-center gap-3 px-4 py-3 rounded-xl border ${c.border} ${c.hoverMuted} transition-colors group`}
+              >
+                <div className="w-9 h-9 rounded-xl bg-emerald-500/15 flex items-center justify-center flex-shrink-0">
+                  <MessageCircle className="w-4 h-4 text-emerald-500" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className={`text-[10px] font-medium uppercase tracking-wide ${c.textFaint}`}>WhatsApp</p>
+                  <p className={`text-sm font-semibold ${c.text}`}>+260 965 335 385</p>
+                </div>
+                <ExternalLink className={`w-3.5 h-3.5 ${c.textGhost} group-hover:text-indigo-500 transition-colors`} />
+              </a>
+
+              <a
+                href="tel:+260771523503"
+                className={`flex items-center gap-3 px-4 py-3 rounded-xl border ${c.border} ${c.hoverMuted} transition-colors`}
+              >
+                <div className="w-9 h-9 rounded-xl bg-indigo-500/15 flex items-center justify-center flex-shrink-0">
+                  <Phone className="w-4 h-4 text-indigo-500" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className={`text-[10px] font-medium uppercase tracking-wide ${c.textFaint}`}>Phone</p>
+                  <p className={`text-sm font-semibold ${c.text}`}>+260 771 523 503</p>
+                </div>
+              </a>
+
+              <a
+                href="tel:+260965335385"
+                className={`flex items-center gap-3 px-4 py-3 rounded-xl border ${c.border} ${c.hoverMuted} transition-colors`}
+              >
+                <div className="w-9 h-9 rounded-xl bg-indigo-500/15 flex items-center justify-center flex-shrink-0">
+                  <Phone className="w-4 h-4 text-indigo-500" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className={`text-[10px] font-medium uppercase tracking-wide ${c.textFaint}`}>Phone</p>
+                  <p className={`text-sm font-semibold ${c.text}`}>+260 965 335 385</p>
+                </div>
+              </a>
+            </div>
+
+            <div className={`px-6 py-3 border-t ${c.border} flex items-center justify-between`}>
+              <span className={`text-[10px] ${c.textGhost}`}>© {new Date().getFullYear()} Bluegold.ltd</span>
+              <button
+                onClick={() => setContactOpen(false)}
+                className="px-4 py-1.5 rounded-lg text-xs font-medium bg-indigo-600 hover:bg-indigo-500 text-white"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ══ SETTINGS MODAL ══ */}
       {settingsOpen && (
