@@ -36,6 +36,14 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 import uvicorn
 
+# Import Ollama automation
+from ollama_manager import (
+    SpecialistRouter,
+    ensure_server_running,
+    set_model_dir,
+    set_ollama_host,
+)
+
 
 # ──────────────────────────────────────────────────────────────────────
 # Paths & DB
@@ -201,6 +209,58 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# ──────────────────────────────────────────────────────────────────────
+# Specialist Router Initialization & Startup Automation
+# ──────────────────────────────────────────────────────────────────────
+# Initialize the specialist router (will be used throughout the app)
+specialist_router = SpecialistRouter(
+    writer_model=os.environ.get("OLLAMA_WRITER_MODEL", "llama3.2:1b"),
+    vision_model=os.environ.get("OLLAMA_VISION_MODEL", "qwen3.5:0.8b"),
+    reasoning_model=os.environ.get("OLLAMA_REASONING_MODEL", "phi4-mini"),
+)
+
+
+@app.on_event("startup")
+async def startup_ollama():
+    """
+    On app startup:
+    1. Configure the Ollama environment (model directory, host)
+    2. Start the Ollama server if not running
+    3. Pre-load the Writer model (lightest) so the first chat is instant
+    """
+    print("\n" + "=" * 70)
+    print("[startup] My_GPT 4 Students — Initializing Ollama Automation")
+    print("=" * 70)
+    
+    # Configure Ollama environment variables
+    set_model_dir(MODEL_DIR)
+    set_ollama_host(OLLAMA_HOST)
+    
+    # Hard constraint: one model at a time on 8GB system
+    os.environ["OLLAMA_MAX_LOADED_MODELS"] = "1"
+    print(f"[startup] RAM Guard: OLLAMA_MAX_LOADED_MODELS=1")
+    
+    # Start Ollama server and wait for it to be responsive
+    print(f"[startup] Ensuring Ollama server is running on {OLLAMA_HOST}…")
+    if ensure_server_running(MODEL_DIR):
+        print("[startup] ✓ Ollama server is running")
+        
+        # Pre-load the Writer model (lightest, fastest to respond)
+        print("[startup] Pre-loading Writer model…")
+        if specialist_router.ensure_writer_loaded():
+            print("[startup] ✓ Writer model ready (chat will be instant)")
+        else:
+            print("[startup] ✗ Failed to pre-load Writer model (will retry on first chat)")
+    else:
+        print(
+            "[startup] ✗ Ollama server failed to start.\n"
+            "           Make sure ollama.exe is at: {MODEL_DIR}/ollama.exe\n"
+            "           Or download from https://ollama.com"
+        )
+    
+    print("=" * 70 + "\n")
 
 
 # ──────────────────────────────────────────────────────────────────────
@@ -585,6 +645,11 @@ def _route_task(
     (final_reply, stages, final_model_used).
 
     Falls back to the offline stub if Ollama isn't installed / reachable.
+    
+    **Key automation:**
+    - Uses specialist_router to intelligently switch models
+    - Unloads old model before loading new one (RAM guard)
+    - Switches back to Writer (lightest) for final formatting
     """
     image_paths = image_paths or []
     stages: list[str] = []
@@ -606,6 +671,8 @@ def _route_task(
         # ── Step 1 · Vision (only if an image is attached) ─────────
         vision_desc = ""
         if image_paths:
+            stages.append(f"Switching to Vision specialist ({_RESOLVED_VISION_MODEL})…")
+            specialist_router.ensure_vision_loaded()  # Smart switch: unload old → load new
             stages.append(f"Analyzing image with {_RESOLVED_VISION_MODEL}…")
             vision_desc = _ollama_chat(
                 _RESOLVED_VISION_MODEL,
@@ -628,6 +695,8 @@ def _route_task(
         use_reasoning = _is_reasoning_task(message) or bool(vision_desc)
         reasoning_out = ""
         if use_reasoning:
+            stages.append(f"Switching to Reasoning specialist ({_RESOLVED_REASONING_MODEL})…")
+            specialist_router.ensure_reasoning_loaded()  # Smart switch
             stages.append(f"Drafting answer with {_RESOLVED_REASONING_MODEL}…")
             user_block = message
             if vision_desc:
@@ -646,6 +715,8 @@ def _route_task(
         # the reasoning specialist for one more pass. This is the cross-model
         # conversation: writer ↔ reasoning, capped at 1 bounce so we don't
         # thrash the RAM.
+        stages.append(f"Switching to Writer specialist ({_RESOLVED_WRITER_MODEL})…")
+        specialist_router.switch_to_writer()  # Switch back to Writer (lightest)
         stages.append(f"Formatting with {_RESOLVED_WRITER_MODEL}…")
         if reasoning_out:
             writer_system = (
@@ -684,6 +755,7 @@ def _route_task(
         ):
             feedback = final.split("\n", 1)[1].strip() if "\n" in final else "Make it clearer and more complete."
             stages.append("Writer asked for clarity — sending back to reasoning…")
+            specialist_router.ensure_reasoning_loaded()  # Switch back to Reasoning
             reasoning_out = _ollama_chat(
                 _RESOLVED_REASONING_MODEL,
                 base_history + [
@@ -705,6 +777,7 @@ def _route_task(
                 ],
             )
             stages.append(f"Re-formatting with {_RESOLVED_WRITER_MODEL}…")
+            specialist_router.switch_to_writer()  # Back to Writer for final polish
             final = _ollama_chat(
                 _RESOLVED_WRITER_MODEL,
                 base_history + [
