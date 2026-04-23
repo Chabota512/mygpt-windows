@@ -34,7 +34,11 @@ fn main() {
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::Destroyed = event {
                 let state = window.state::<AppState>();
-                if let Some(handles) = state.backend.lock().unwrap().take() {
+                let taken = {
+                    let mut guard = state.backend.lock().unwrap();
+                    guard.take()
+                };
+                if let Some(handles) = taken {
                     backend::stop_all(handles);
                 }
             }
