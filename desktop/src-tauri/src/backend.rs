@@ -79,7 +79,7 @@ pub async fn restart_ollama(handles: &mut BackendHandles, app: &AppHandle) -> Re
     }
 }
 
-async fn start_ollama(app: &AppHandle) -> Option<CommandChild> {
+pub async fn start_ollama(app: &AppHandle) -> Option<CommandChild> {
     if is_port_open(OLLAMA_PORT).await {
         eprintln!("[mygpt] ollama already running on :{}", OLLAMA_PORT);
         return None;

@@ -1371,7 +1371,7 @@ export function MainApp() {
               /* ── WELCOME / FIRST-RUN SCREEN ── */
               <div className="flex flex-col items-center justify-center text-center py-16 px-4">
                 <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center shadow-lg shadow-indigo-500/30 mb-5 overflow-hidden">
-                  <img src="/app-icons/MyGPT.png" alt="MyGPT" className="w-10 h-10 object-contain" />
+                  <img src="/MyGPT.png" alt="MyGPT" className="w-10 h-10 object-contain" />
                 </div>
                 <h2 className={`text-xl font-semibold ${c.text}`}>
                   {greeting.title}
@@ -1418,7 +1418,7 @@ export function MainApp() {
               <div key={msg.id} className={`flex gap-3 ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
                 {msg.role === "assistant" && (
                   <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center flex-shrink-0 mt-0.5 shadow-md shadow-indigo-500/20 overflow-hidden">
-                    <img src="/app-icons/MyGPT.png" alt="MyGPT" className="w-4.5 h-4.5 object-contain" />
+                    <img src="/MyGPT.png" alt="MyGPT" className="w-4.5 h-4.5 object-contain" />
                   </div>
                 )}
                 <div className={`max-w-[75%] ${msg.role === "user" ? "order-first" : ""}`}>
@@ -1449,7 +1449,7 @@ export function MainApp() {
             {(docGenerating || currentDoc) && (
               <div className="flex gap-3 justify-start">
                 <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center flex-shrink-0 mt-0.5 shadow-md shadow-indigo-500/20 overflow-hidden">
-                  <img src="/app-icons/MyGPT.png" alt="MyGPT" className="w-4.5 h-4.5 object-contain" />
+                  <img src="/MyGPT.png" alt="MyGPT" className="w-4.5 h-4.5 object-contain" />
                 </div>
                 <div className="flex-1 max-w-[85%]">
                   <div className={`rounded-2xl px-4 py-3 text-sm mb-3 leading-relaxed ${c.assistMsg}`}>
@@ -1548,7 +1548,7 @@ export function MainApp() {
             {isThinking && (
               <div className="flex gap-3 justify-start" role="status" aria-live="polite" aria-label="Assistant is thinking">
                 <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center flex-shrink-0 shadow-md shadow-indigo-500/20 overflow-hidden">
-                  <img src="/app-icons/MyGPT.png" alt="MyGPT" className="w-4.5 h-4.5 object-contain" />
+                  <img src="/MyGPT.png" alt="MyGPT" className="w-4.5 h-4.5 object-contain" />
                 </div>
                 <div className={`${c.card} border ${c.border} rounded-2xl rounded-tl-sm px-4 py-3`}>
                   <div className="flex gap-1 items-center h-4">
@@ -2578,7 +2578,7 @@ export function MainApp() {
           >
             <div className="px-6 pt-7 pb-5 text-center">
               <div className="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center shadow-lg shadow-indigo-500/30 mb-4 overflow-hidden">
-                <img src="/app-icons/MyGPT.png" alt="MyGPT" className="w-10 h-10 object-contain" />
+                <img src="/MyGPT.png" alt="MyGPT" className="w-10 h-10 object-contain" />
               </div>
               <h2 className={`text-lg font-semibold ${c.text}`}>Welcome 👋</h2>
               <p className={`text-sm mt-2 ${c.textBody}`}>
