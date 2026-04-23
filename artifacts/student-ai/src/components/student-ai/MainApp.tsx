@@ -1444,7 +1444,7 @@ export function MainApp() {
                   title="Attach PDF or image"
                   aria-label="Attach a PDF or image"
                   className={`flex items-center justify-center ${c.textGhost} hover:${c.textMuted} transition-colors`}>
-                  <Plus style={{ width: 10, height: 10 }} strokeWidth={1.25} />
+                  <Plus style={{ width: 8, height: 8 }} strokeWidth={1.25} />
                 </button>
                 <input
                   ref={fileInputRef}
@@ -1461,13 +1461,13 @@ export function MainApp() {
                   title="Take or upload a photo"
                   aria-label="Take or upload a photo"
                   className={`flex items-center justify-center ${c.textGhost} hover:${c.textMuted} transition-colors`}>
-                  <Camera style={{ width: 10, height: 10 }} strokeWidth={1.25} />
+                  <Camera style={{ width: 8, height: 8 }} strokeWidth={1.25} />
                 </button>
                 <button
                   title="Voice input (coming soon)"
                   aria-label="Voice input"
                   className={`flex items-center justify-center ${c.textGhost} hover:${c.textMuted} transition-colors`}>
-                  <AudioLines style={{ width: 10, height: 10 }} strokeWidth={1.25} />
+                  <AudioLines style={{ width: 8, height: 8 }} strokeWidth={1.25} />
                 </button>
               </div>
             </div>
