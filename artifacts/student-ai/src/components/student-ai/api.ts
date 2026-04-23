@@ -131,6 +131,22 @@ export const api = {
   getStorage: () => fetch(`${API_BASE}/storage`).then(j<ApiStorageInfo>),
   getModelStorage: () => fetch(`${API_BASE}/model-storage`).then(j<ApiModelStorageInfo>),
 
+  // ── LLM Configuration ──────────────────────────────────────
+  getLLMConfig: () => fetch(`${API_BASE}/llm-config`).then(j<ApiLLMConfig>),
+  setLLMConfig: (cfg: ApiLLMConfig) =>
+    fetch(`${API_BASE}/llm-config`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(cfg),
+    }).then(j<ApiLLMConfig>),
+  testLLM: (cfg: ApiLLMConfig) =>
+    fetch(`${API_BASE}/llm-test`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(cfg),
+    }).then(j<ApiLLMTestResult>),
+  getLLMStatus: () => fetch(`${API_BASE}/llm-status`).then(j<ApiLLMStatus>),
+
   // ── Profile ───────────────────────────────────────────────
   getProfile: () => fetch(`${API_BASE}/profile`).then(j<ApiProfile>),
   putProfile: (p: ApiProfile) =>
@@ -169,4 +185,26 @@ export type ApiModelStorageInfo = {
   free_human: string;
   total_bytes: number;
   total_human: string;
+};
+
+export type ApiLLMConfig = {
+  ollama_host: string;
+  vision_model: string;
+  reasoning_model: string;
+  writer_model: string;
+};
+
+export type ApiLLMTestResult = {
+  success: boolean;
+  message: string;
+  available_models: string[];
+};
+
+export type ApiLLMStatus = {
+  ollama_host: string;
+  vision_model: string;
+  reasoning_model: string;
+  writer_model: string;
+  online: boolean;
+  available_models: string[];
 };

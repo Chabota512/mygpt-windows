@@ -96,14 +96,23 @@
 }
 
 @layer base {
-  * {
-    border-color: hsl(var(--border));
+  html {
+    height: 100%;
   }
   body {
+    height: 100vh;
+    overflow: hidden;
     font-family: var(--app-font-sans);
     -webkit-font-smoothing: antialiased;
     background-color: hsl(var(--background));
     color: hsl(var(--foreground));
+  }
+  #root {
+    height: 100%;
+    width: 100%;
+  }
+  * {
+    border-color: hsl(var(--border));
   }
 
   /* Themed scrollbars — light mode */

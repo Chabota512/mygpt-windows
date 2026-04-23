@@ -8,6 +8,8 @@ import {
   type ApiMemoryItem,
   type ApiSearchHit,
   type ApiDocument,
+  type ApiLLMConfig,
+  type ApiLLMStatus,
 } from "./api";
 import {
   GraduationCap, Send, FileText, Image, BookOpen, Settings,
@@ -644,7 +646,63 @@ export function MainApp() {
     catch { setModelStorage(null); }
     finally { setModelStorageLoading(false); }
   }, []);
-  useEffect(() => { if (settingsOpen) { refreshStorage(); refreshModelStorage(); } }, [settingsOpen, refreshStorage, refreshModelStorage]);
+
+  /* LLM Configuration */
+  const [llmConfig, setLlmConfig] = useState<ApiLLMConfig | null>(null);
+  const [llmStatus, setLlmStatus] = useState<ApiLLMStatus | null>(null);
+  const [llmLoading, setLlmLoading] = useState(false);
+  const [llmTesting, setLlmTesting] = useState(false);
+  const [llmTestMsg, setLlmTestMsg] = useState<string>("");
+  const [showLLMAdvanced, setShowLLMAdvanced] = useState(false);
+
+  const refreshLLMStatus = useCallback(async () => {
+    setLlmLoading(true);
+    try { setLlmStatus(await api.getLLMStatus()); }
+    catch { setLlmStatus(null); }
+    finally { setLlmLoading(false); }
+  }, []);
+
+  const refreshLLMConfig = useCallback(async () => {
+    try { setLlmConfig(await api.getLLMConfig()); }
+    catch { setLlmConfig(null); }
+  }, []);
+
+  const handleTestLLM = useCallback(async () => {
+    if (!llmConfig) return;
+    setLlmTesting(true);
+    setLlmTestMsg("");
+    try {
+      const result = await api.testLLM(llmConfig);
+      setLlmTestMsg(result.message);
+      if (result.success) {
+        await refreshLLMStatus();
+      }
+    } catch (e) {
+      setLlmTestMsg(`Error: ${e instanceof Error ? e.message : "Unknown error"}`);
+    } finally {
+      setLlmTesting(false);
+    }
+  }, [llmConfig, refreshLLMStatus]);
+
+  const handleSaveLLMConfig = useCallback(async () => {
+    if (!llmConfig) return;
+    try {
+      await api.setLLMConfig(llmConfig);
+      setLlmTestMsg("✓ Configuration saved!");
+      await refreshLLMStatus();
+    } catch (e) {
+      setLlmTestMsg(`Error saving config: ${e instanceof Error ? e.message : "Unknown error"}`);
+    }
+  }, [llmConfig, refreshLLMStatus]);
+
+  useEffect(() => { 
+    if (settingsOpen) { 
+      refreshStorage(); 
+      refreshModelStorage(); 
+      refreshLLMConfig();
+      refreshLLMStatus();
+    } 
+  }, [settingsOpen, refreshStorage, refreshModelStorage, refreshLLMConfig, refreshLLMStatus]);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
 
   /* Onboarding banner */
@@ -2028,6 +2086,168 @@ export function MainApp() {
                     </div>
                   );
                 })()}
+              </section>
+
+              {/* LLM Configuration */}
+              <section>
+                <h3 className={`text-[11px] uppercase tracking-widest font-semibold mb-3 ${c.textFaint}`}>LLM Configuration</h3>
+                
+                {/* Status Card */}
+                {llmStatus && (
+                  <div className={`rounded-xl border ${llmStatus.online ? "border-emerald-500/30 bg-emerald-500/5" : `${c.border} ${c.bgMuted}`} p-3.5 mb-3`}>
+                    <div className="flex items-center gap-3">
+                      <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${llmStatus.online ? "bg-emerald-500/15" : "bg-amber-500/15"}`}>
+                        {llmStatus.online ? (
+                          <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                        ) : (
+                          <WifiOff className="w-4 h-4 text-amber-500" />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className={`text-xs font-medium ${c.text}`}>
+                          {llmStatus.online ? "Ollama Connected" : "Ollama Offline"}
+                        </p>
+                        <p className={`text-[11px] mt-0.5 ${c.textFaint}`}>
+                          {llmStatus.online
+                            ? `${llmStatus.available_models.length} model(s) available`
+                            : "No connection to Ollama"}
+                        </p>
+                      </div>
+                      <button
+                        onClick={refreshLLMStatus}
+                        disabled={llmLoading}
+                        className={`px-2 py-1 rounded-md text-[10px] font-medium border ${c.border} ${c.textBody} ${c.hoverMuted} disabled:opacity-50`}
+                        title="Refresh status"
+                      >
+                        {llmLoading ? "..." : "Refresh"}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Configuration Inputs */}
+                <div className={`space-y-3 rounded-xl border ${c.border} ${c.bgMuted} p-3.5`}>
+                  <div>
+                    <label className={`block text-[11px] font-medium ${c.text} mb-1.5`}>Ollama Host URL</label>
+                    <input
+                      type="text"
+                      value={llmConfig?.ollama_host || ""}
+                      onChange={(e) => llmConfig && setLlmConfig({ ...llmConfig, ollama_host: e.target.value })}
+                      placeholder="http://localhost:11434"
+                      className={`w-full px-2 py-1.5 text-[11px] rounded-lg border ${c.border} ${c.card} ${c.text} focus:outline-none focus:ring-2 focus:ring-indigo-500`}
+                    />
+                    <p className={`text-[10px] mt-0.5 ${c.textFaint}`}>URL where Ollama is running (usually localhost:11434)</p>
+                  </div>
+
+                  {/* Model Selection */}
+                  {llmStatus?.online && llmStatus.available_models.length > 0 && (
+                    <div className={`rounded-lg border ${c.border} ${c.bgSub} p-2.5 space-y-2`}>
+                      <p className={`text-[11px] font-medium ${c.textBody}`}>Available models to assign:</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {llmStatus.available_models.map((model) => (
+                          <button
+                            key={model}
+                            onClick={() => {
+                              if (llmConfig) {
+                                // Cycle through roles: vision → reasoning → writer
+                                const current = 
+                                  llmConfig.vision_model === model ? llmConfig.reasoning_model === model ? "writer" : "reasoning"
+                                  : llmConfig.reasoning_model === model ? "writer"
+                                  : llmConfig.writer_model === model ? "vision"
+                                  : "vision";
+                                const updated = { ...llmConfig };
+                                updated[`${current}_model` as keyof typeof updated] = model;
+                                setLlmConfig(updated);
+                              }
+                            }}
+                            className={`px-2 py-1 rounded-md text-[10px] font-medium border transition-all ${
+                              llmConfig?.vision_model === model || llmConfig?.reasoning_model === model || llmConfig?.writer_model === model
+                                ? "bg-indigo-600 text-white border-indigo-600"
+                                : `border ${c.border} ${c.textBody} ${c.hoverMuted}`
+                            }`}
+                            title={`Click to assign to roles. Currently: ${
+                              llmConfig?.vision_model === model ? "Vision" : llmConfig?.reasoning_model === model ? "Reasoning" : llmConfig?.writer_model === model ? "Writer" : "Unassigned"
+                            }`}
+                          >
+                            {model}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Advanced Configuration */}
+                  <details className={`group/adv`}>
+                    <summary className={`cursor-pointer text-[11px] font-medium ${c.textBody} ${c.hoverMuted} list-none flex items-center gap-1.5 select-none`}>
+                      <ChevronRight className="w-3 h-3 transition-transform group-open/adv:rotate-90" />
+                      Model assignments (advanced)
+                    </summary>
+                    <div className={`mt-2 space-y-2`}>
+                      <div>
+                        <label className={`block text-[10px] font-medium ${c.textMuted} mb-0.5`}>Vision (for images)</label>
+                        <input
+                          type="text"
+                          value={llmConfig?.vision_model || ""}
+                          onChange={(e) => llmConfig && setLlmConfig({ ...llmConfig, vision_model: e.target.value })}
+                          className={`w-full px-2 py-1 text-[10px] rounded-lg border ${c.border} ${c.card} ${c.text} focus:outline-none focus:ring-1 focus:ring-indigo-500`}
+                        />
+                      </div>
+                      <div>
+                        <label className={`block text-[10px] font-medium ${c.textMuted} mb-0.5`}>Reasoning (for problem-solving)</label>
+                        <input
+                          type="text"
+                          value={llmConfig?.reasoning_model || ""}
+                          onChange={(e) => llmConfig && setLlmConfig({ ...llmConfig, reasoning_model: e.target.value })}
+                          className={`w-full px-2 py-1 text-[10px] rounded-lg border ${c.border} ${c.card} ${c.text} focus:outline-none focus:ring-1 focus:ring-indigo-500`}
+                        />
+                      </div>
+                      <div>
+                        <label className={`block text-[10px] font-medium ${c.textMuted} mb-0.5`}>Writer (for explanations)</label>
+                        <input
+                          type="text"
+                          value={llmConfig?.writer_model || ""}
+                          onChange={(e) => llmConfig && setLlmConfig({ ...llmConfig, writer_model: e.target.value })}
+                          className={`w-full px-2 py-1 text-[10px] rounded-lg border ${c.border} ${c.card} ${c.text} focus:outline-none focus:ring-1 focus:ring-indigo-500`}
+                        />
+                      </div>
+                    </div>
+                  </details>
+
+                  {/* Test & Save Buttons */}
+                  <div className="flex gap-2 pt-1">
+                    <button
+                      onClick={handleTestLLM}
+                      disabled={llmTesting || !llmConfig}
+                      className={`flex-1 px-3 py-1.5 rounded-lg text-[11px] font-medium border ${c.border} ${c.textBody} ${c.hoverMuted} disabled:opacity-50 transition-all flex items-center justify-center gap-1.5`}
+                    >
+                      {llmTesting ? (
+                        <><Loader2 className="w-3 h-3 animate-spin" /> Testing...</>
+                      ) : (
+                        <>Test Connection</>
+                      )}
+                    </button>
+                    <button
+                      onClick={handleSaveLLMConfig}
+                      disabled={!llmConfig}
+                      className={`flex-1 px-3 py-1.5 rounded-lg text-[11px] font-medium border border-indigo-600 bg-indigo-600 text-white ${c.hoverMuted} disabled:opacity-50 transition-all`}
+                    >
+                      Save Configuration
+                    </button>
+                  </div>
+
+                  {/* Test Result Message */}
+                  {llmTestMsg && (
+                    <div className={`rounded-lg border ${llmTestMsg.includes("✓") || llmTestMsg.includes("Found") ? "border-emerald-500/30 bg-emerald-500/5" : "border-amber-500/30 bg-amber-500/5"} p-2.5`}>
+                      <p className={`text-[10px] ${llmTestMsg.includes("✓") || llmTestMsg.includes("Found") ? "text-emerald-600" : "text-amber-600"}`}>
+                        {llmTestMsg}
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                <p className={`text-[10px] mt-2 ${c.textFaint}`}>
+                  Only one model loads at a time to save RAM. The app automatically manages which model is in memory based on your requests.
+                </p>
               </section>
 
               {/* Profile */}

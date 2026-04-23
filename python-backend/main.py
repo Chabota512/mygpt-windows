@@ -375,7 +375,7 @@ _REASONING_HINTS = re.compile(
     r"resistance|impedance|torque|force|velocity|acceleration|kinematic|dynamic|"
     r"physics|chemistry|formula|theorem|algorithm|big[- ]?o|complexity|"
     r"function|variable|loop|class|method|stack|trace|debug|compile|runtime|"
-    r"python|java(?:script)?|typescript|c\+\+|c#|rust|sql|regex"
+    r"python|java(?:script)?|typescript|c\+\+|c\#|rust|sql|regex"
     r")\b"
 )
 _CODE_FENCE = re.compile(r"```|`[^`]+`")
@@ -1227,6 +1227,157 @@ def model_storage():
         free_human=_human_bytes(free),
         total_bytes=total,
         total_human=_human_bytes(total),
+    )
+
+
+# ──────────────────────────────────────────────────────────────────────
+# LLM Configuration (persisted to disk so it survives restarts)
+# ──────────────────────────────────────────────────────────────────────
+LLM_CONFIG_PATH = DATA_DIR / "llm_config.json"
+
+
+class LLMConfig(BaseModel):
+    ollama_host: str = "http://localhost:11434"
+    vision_model: str = "qwen3.5:0.8b"
+    reasoning_model: str = "phi4-mini"
+    writer_model: str = "llama3.2:1b"
+
+
+def load_llm_config() -> LLMConfig:
+    """Load LLM config from disk, or return defaults."""
+    if LLM_CONFIG_PATH.exists():
+        try:
+            import json
+            data = json.loads(LLM_CONFIG_PATH.read_text("utf-8"))
+            return LLMConfig(**data)
+        except Exception as e:
+            print(f"[LLM] Failed to load config: {e}")
+    return LLMConfig()
+
+
+def save_llm_config(cfg: LLMConfig) -> None:
+    """Save LLM config to disk."""
+    import json
+    LLM_CONFIG_PATH.write_text(json.dumps(cfg.model_dump(), ensure_ascii=False), "utf-8")
+
+
+class LLMTestResult(BaseModel):
+    success: bool
+    message: str
+    available_models: List[str] = []
+
+
+class LLMStatus(BaseModel):
+    ollama_host: str
+    vision_model: str
+    reasoning_model: str
+    writer_model: str
+    online: bool
+    available_models: List[str]
+
+
+@app.get("/llm-config", response_model=LLMConfig)
+def get_llm_config():
+    """Get current LLM configuration."""
+    cfg = load_llm_config()
+    # Also load from environment if set (env vars override stored config)
+    cfg.ollama_host = os.environ.get("OLLAMA_HOST", cfg.ollama_host)
+    cfg.vision_model = os.environ.get("OLLAMA_VISION_MODEL", cfg.vision_model)
+    cfg.reasoning_model = os.environ.get("OLLAMA_REASONING_MODEL", cfg.reasoning_model)
+    cfg.writer_model = os.environ.get("OLLAMA_WRITER_MODEL", cfg.writer_model)
+    return cfg
+
+
+@app.post("/llm-config", response_model=LLMConfig)
+def set_llm_config(cfg: LLMConfig):
+    """Update LLM configuration and save to disk."""
+    save_llm_config(cfg)
+    # Update environment vars so they take effect immediately
+    os.environ["OLLAMA_HOST"] = cfg.ollama_host
+    os.environ["OLLAMA_VISION_MODEL"] = cfg.vision_model
+    os.environ["OLLAMA_REASONING_MODEL"] = cfg.reasoning_model
+    os.environ["OLLAMA_WRITER_MODEL"] = cfg.writer_model
+    return cfg
+
+
+@app.post("/llm-test", response_model=LLMTestResult)
+def test_llm_connection(cfg: LLMConfig):
+    """Test connection to Ollama and list available models."""
+    try:
+        import requests
+        
+        # Test basic connectivity
+        health_url = f"{cfg.ollama_host}/api/tags"
+        response = requests.get(health_url, timeout=5)
+        
+        if response.status_code != 200:
+            return LLMTestResult(
+                success=False,
+                message=f"Ollama not responding (HTTP {response.status_code}). Make sure Ollama is running.",
+            )
+        
+        # Get available models
+        data = response.json()
+        models = [m.get("name", "") for m in data.get("models", [])]
+        
+        if not models:
+            return LLMTestResult(
+                success=True,
+                message="Connected to Ollama, but no models found. Pull some models with `ollama pull <model>`.",
+                available_models=models,
+            )
+        
+        return LLMTestResult(
+            success=True,
+            message=f"✓ Connected! Found {len(models)} model(s) available.",
+            available_models=sorted(models),
+        )
+    except requests.ConnectionError:
+        return LLMTestResult(
+            success=False,
+            message=f"Cannot reach Ollama at {cfg.ollama_host}. Is it running?",
+        )
+    except requests.Timeout:
+        return LLMTestResult(
+            success=False,
+            message=f"Connection to Ollama timed out. Check your host URL and internet.",
+        )
+    except Exception as e:
+        return LLMTestResult(
+            success=False,
+            message=f"Error testing Ollama: {str(e)}",
+        )
+
+
+@app.get("/llm-status", response_model=LLMStatus)
+def get_llm_status():
+    """Get current LLM status (config + online check)."""
+    cfg = load_llm_config()
+    cfg.ollama_host = os.environ.get("OLLAMA_HOST", cfg.ollama_host)
+    cfg.vision_model = os.environ.get("OLLAMA_VISION_MODEL", cfg.vision_model)
+    cfg.reasoning_model = os.environ.get("OLLAMA_REASONING_MODEL", cfg.reasoning_model)
+    cfg.writer_model = os.environ.get("OLLAMA_WRITER_MODEL", cfg.writer_model)
+    
+    available_models = []
+    online = False
+    
+    try:
+        import requests
+        response = requests.get(f"{cfg.ollama_host}/api/tags", timeout=2)
+        if response.status_code == 200:
+            online = True
+            data = response.json()
+            available_models = sorted([m.get("name", "") for m in data.get("models", [])])
+    except Exception:
+        pass
+    
+    return LLMStatus(
+        ollama_host=cfg.ollama_host,
+        vision_model=cfg.vision_model,
+        reasoning_model=cfg.reasoning_model,
+        writer_model=cfg.writer_model,
+        online=online,
+        available_models=available_models,
     )
 
 
