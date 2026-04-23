@@ -1438,13 +1438,13 @@ export function MainApp() {
                 }}
                 placeholder={activeTool === "Write Doc" ? "Describe the document you want written..." : activeTool === "Calculator" ? "Type a calculation or use the floating calculator..." : activeTool === "Search Notes" ? "Type to search your notes and files..." : "Ask anything, attach images or PDFs..."}
                 className={`flex-1 bg-transparent text-sm resize-none outline-none leading-relaxed px-4 pt-3 pb-1 ${c.textMd} placeholder:${c.textGhost}`} />
-              <div className="flex items-center gap-0 px-3 pb-2">
+              <div className="flex items-center gap-1 px-3 pb-2">
                 <button
                   onClick={() => fileInputRef.current?.click()}
                   title="Attach PDF or image"
                   aria-label="Attach a PDF or image"
-                  className={`w-3.5 h-3.5 flex items-center justify-center rounded ${c.textGhost} ${c.hoverMuted} transition-colors`}>
-                  <Plus className="w-2.5 h-2.5" strokeWidth={1.25} />
+                  className={`flex items-center justify-center ${c.textGhost} hover:${c.textMuted} transition-colors`}>
+                  <Plus style={{ width: 10, height: 10 }} strokeWidth={1.25} />
                 </button>
                 <input
                   ref={fileInputRef}
@@ -1460,14 +1460,14 @@ export function MainApp() {
                   onClick={() => fileInputRef.current?.click()}
                   title="Take or upload a photo"
                   aria-label="Take or upload a photo"
-                  className={`w-3.5 h-3.5 flex items-center justify-center rounded ${c.textGhost} ${c.hoverMuted} transition-colors`}>
-                  <Camera className="w-2.5 h-2.5" strokeWidth={1.25} />
+                  className={`flex items-center justify-center ${c.textGhost} hover:${c.textMuted} transition-colors`}>
+                  <Camera style={{ width: 10, height: 10 }} strokeWidth={1.25} />
                 </button>
                 <button
                   title="Voice input (coming soon)"
                   aria-label="Voice input"
-                  className={`w-3.5 h-3.5 flex items-center justify-center rounded ${c.textGhost} ${c.hoverMuted} transition-colors`}>
-                  <AudioLines className="w-2.5 h-2.5" strokeWidth={1.25} />
+                  className={`flex items-center justify-center ${c.textGhost} hover:${c.textMuted} transition-colors`}>
+                  <AudioLines style={{ width: 10, height: 10 }} strokeWidth={1.25} />
                 </button>
               </div>
             </div>
