@@ -42,29 +42,6 @@ function getInitials(name: string): string {
 type Message = { id: number; role: "user" | "assistant"; content: string; timestamp: string };
 type Attachment = { name: string; kind: "image" | "pdf" | "doc" };
 
-/* ─────────────── Demo data ─────────────── */
-const DEMO_MESSAGES: Message[] = [
-  { id: 1, role: "user", content: "Can you explain PID control from the diagram I uploaded in our last session?", timestamp: "09:14" },
-  { id: 2, role: "assistant", content: `From your uploaded notes on **PID Control Systems** (Session: Nov 12), here's a breakdown:\n\nA **PID controller** has three components:\n\n- **P (Proportional):** Reacts to the *current* error.\n- **I (Integral):** Eliminates steady-state error by accumulating past errors.\n- **D (Derivative):** Predicts future error — dampens oscillation.\n\nCombined output: **u(t) = Kp·e(t) + Ki·∫e(t)dt + Kd·de(t)/dt**\n\nIn your lab diagram, the feedback loop shows the sensor output subtracted from the setpoint to compute *e(t)*. Would you like me to draft a lab report on this?`, timestamp: "09:14" },
-  { id: 3, role: "user", content: "Yes please — write a full lab report introduction and experimental setup section.", timestamp: "09:15" },
-];
-
-const DOC_SECTIONS = [
-  { label: "Title Page", done: true },
-  { label: "Abstract", done: true },
-  { label: "Introduction", done: true },
-  { label: "Experimental Setup", done: false, active: true },
-  { label: "Results & Analysis", done: false },
-  { label: "Conclusion & References", done: false },
-];
-
-const SEARCH_RESULTS = [
-  { type: "pdf" as const, title: "PID Control Notes — Lecture Notes ME301", path: "Memory › Uploads › Nov 12, 2024", snippet: "…the feedback loop in a **PID control** system compares the setpoint to the measured output to compute error *e(t)*. The controller then applies proportional, integral and derivative corrections…", meta: "12 pages · PDF", relevance: 98 },
-  { type: "image" as const, title: "Lab Diagram — Servo Motor Feedback Loop", path: "Memory › Images › Nov 10, 2024", snippet: "Whiteboard photo showing a servo motor **PID feedback** loop block diagram. Labels: Setpoint, Error, Controller, Plant, Sensor. Handwritten gain values Kp=1.2, Ki=0.4…", meta: "1 image · JPG", relevance: 91 },
-  { type: "pdf" as const, title: "Thermodynamics Ch.5 — Feedback Control Applications", path: "Memory › PDFs › Nov 8, 2024", snippet: "Chapter 5 covers thermal **feedback** systems and control loops applied to heat exchangers. Section 5.3 references **PID** tuning for thermal regulation using Ziegler–Nichols…", meta: "28 pages · PDF", relevance: 74 },
-  { type: "doc" as const, title: "Assignment 3 Draft — Control Systems", path: "Memory › Documents › Nov 7, 2024", snippet: "We implement a digital **PID controller** using MATLAB Simulink. The **feedback** topology follows the block diagram from lecture 8, with discretisation step Ts=0.01s…", meta: "6 pages · DOCX", relevance: 67 },
-];
-
 const CALC_SCHOOLS = [
   { id: "engineering", label: "Engineering", short: "Sci", icon: FlaskConical, color: "text-indigo-500", rows: [["sin","cos","tan","π"],["log","ln","√","x²"],["(",")","%","÷"],["7","8","9","×"],["4","5","6","−"],["1","2","3","+"],["±","0",".","="]] },
   { id: "business",    label: "Business",    short: "Fin", icon: TrendingUp,   color: "text-emerald-600", rows: [["PV","FV","PMT","n"],["i%","NPV","IRR","%"],["(",")",  "CE","÷"],["7","8","9","×"],["4","5","6","−"],["1","2","3","+"],["±","0",".","="]] },
@@ -75,12 +52,6 @@ const CALC_SCHOOLS = [
 ];
 
 type Session = { id: string; label: string; time: string };
-const INITIAL_SESSIONS: Session[] = [
-  { id: "s1", label: "PID Control Study", time: "Today" },
-  { id: "s2", label: "Thermodynamics Laws", time: "Yesterday" },
-  { id: "s3", label: "Circuit Analysis", time: "Mon" },
-  { id: "s4", label: "Mechanics of Materials", time: "Last week" },
-];
 
 const SUGGESTIONS = [
   { icon: "📘", title: "Explain a concept", subtitle: "Break down a topic step by step" },
@@ -98,13 +69,6 @@ const SHORTCUTS: { keys: string; label: string }[] = [
   { keys: "Ctrl + 0", label: "Reset size to 100%" },
   { keys: "?",        label: "Show this shortcuts list" },
   { keys: "Esc",      label: "Close any open dialog" },
-];
-
-const MEMORY_ITEMS = [
-  { icon: FileText, label: "PID Control Notes", date: "Nov 12" },
-  { icon: Image,    label: "Lab Diagram — Servo Motor", date: "Nov 10" },
-  { icon: BookOpen, label: "Thermodynamics Ch. 5 PDF", date: "Nov 8" },
-  { icon: FileText, label: "Assignment 3 Draft", date: "Nov 7" },
 ];
 
 /* ─────────────── Theme palette ─────────────── */
@@ -257,15 +221,12 @@ export function MainApp() {
   const [input, setInput] = useState("");
   const [activeTab, setActiveTab] = useState<"chat" | "memory" | "docs">("chat");
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [activeChat, setActiveChat] = useState("PID Control Study");
+  const [activeChat, setActiveChat] = useState("New Chat");
   const [toolsOpen, setToolsOpen] = useState(false);
   const [activeTool, setActiveTool] = useState<string | null>(null);
   const [rightOpen, setRightOpen] = useState(true);
-  const [attachments, setAttachments] = useState<Attachment[]>([
-    { name: "servo_diagram.jpg", kind: "image" },
-    { name: "Thermodynamics_Ch5.pdf", kind: "pdf" },
-  ]);
-  const [searchQuery, setSearchQuery] = useState("PID control feedback loop");
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
 
   /* Calculator */
   const [calcSchool, setCalcSchool] = useState("engineering");
@@ -315,8 +276,8 @@ export function MainApp() {
   };
   const userInitials = getInitials(profile.name);
 
-  /* Sessions (backend-backed; INITIAL_SESSIONS used until backend responds) */
-  const [sessions, setSessions] = useState<Session[]>(INITIAL_SESSIONS);
+  /* Sessions (backend-backed) */
+  const [sessions, setSessions] = useState<Session[]>([]);
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
   const [editingSessionDraft, setEditingSessionDraft] = useState("");
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
@@ -367,11 +328,11 @@ export function MainApp() {
   };
 
   /* Empty / first-run chat & thinking state */
-  const [isEmptyChat, setIsEmptyChat] = useState(false);
+  const [isEmptyChat, setIsEmptyChat] = useState(true);
   const [isThinking, setIsThinking] = useState(false);
 
   /* ─── Backend wiring (local Python FastAPI on http://localhost:8000) ─── */
-  const [messages, setMessages] = useState<Message[]>(DEMO_MESSAGES);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [backendError, setBackendError] = useState<string | null>(null);
   const [backendOnline, setBackendOnline] = useState<boolean>(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -942,17 +903,13 @@ export function MainApp() {
             </div>
 
             <div className={`px-4 py-3 border-t ${c.border}`}>
-              <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center justify-between">
                 <div className="flex items-center gap-1.5">
-                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  <span className={`text-[10px] font-medium ${c.textMuted}`}>Llama 3.1 · 8B Q4</span>
+                  <div className={`w-1.5 h-1.5 rounded-full ${backendOnline ? "bg-emerald-500 animate-pulse" : "bg-amber-500"}`} />
+                  <span className={`text-[10px] font-medium ${c.textMuted}`}>{backendOnline ? "Local backend online" : "Backend not reachable"}</span>
                 </div>
                 <WifiOff className={`w-3 h-3 ${c.textGhost}`} />
               </div>
-              <div className={`w-full ${c.vramTrack} rounded-full h-1`}>
-                <div className="bg-indigo-500/70 h-1 rounded-full" style={{ width: "62%" }} />
-              </div>
-              <p className={`text-[10px] mt-1 ${c.textXs}`}>3.2 GB / 5.1 GB VRAM</p>
             </div>
 
             <button className={`flex items-center gap-2.5 px-5 py-3 border-t ${c.border} ${c.textMuted} ${c.hoverMuted} transition-colors text-xs`}>
@@ -997,7 +954,11 @@ export function MainApp() {
             )}
             <div>
               <h1 className={`text-sm font-semibold ${c.text}`}>{activeChat}</h1>
-              <p className={`text-[11px] ${c.textFaint}`}>4 messages · 2 memory items referenced</p>
+              <p className={`text-[11px] ${c.textFaint}`}>
+                {messages.length === 0
+                  ? "No messages yet"
+                  : `${messages.length} message${messages.length === 1 ? "" : "s"}${memoryItems.length > 0 ? ` · ${memoryItems.length} memory item${memoryItems.length === 1 ? "" : "s"} available` : ""}`}
+              </p>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -1239,14 +1200,16 @@ export function MainApp() {
               </div>
             ) : (
             <>
-            {/* Memory banner */}
-            <div className={`flex items-center gap-2.5 px-4 py-2.5 rounded-xl ${c.memBannerBg} border`}>
-              <Layers className="w-3.5 h-3.5 text-indigo-500 flex-shrink-0" />
-              <p className={`text-xs ${c.memBannerText}`}>
-                <span className={`font-semibold ${c.memBannerStrong}`}>2 memory items</span> loaded — PID Notes (Nov 12) and Lab Diagram (Nov 10)
-              </p>
-              <ChevronRight className={`w-3.5 h-3.5 ${c.memBannerArrow} ml-auto`} />
-            </div>
+            {/* Memory banner — only when memory has been loaded into this chat */}
+            {memoryItems.length > 0 && (
+              <div className={`flex items-center gap-2.5 px-4 py-2.5 rounded-xl ${c.memBannerBg} border`}>
+                <Layers className="w-3.5 h-3.5 text-indigo-500 flex-shrink-0" />
+                <p className={`text-xs ${c.memBannerText}`}>
+                  <span className={`font-semibold ${c.memBannerStrong}`}>{memoryItems.length} memory item{memoryItems.length === 1 ? "" : "s"}</span> available for context
+                </p>
+                <ChevronRight className={`w-3.5 h-3.5 ${c.memBannerArrow} ml-auto`} />
+              </div>
+            )}
 
             {/* Messages */}
             {messages.map(msg => (
@@ -1332,7 +1295,7 @@ export function MainApp() {
                       </div>
                     </div>
                     <div className="px-4 py-3 grid grid-cols-2 gap-y-2 gap-x-4">
-                      {(currentDoc?.sections ?? DOC_SECTIONS.map(s => s.label)).map((label, i) => {
+                      {(currentDoc?.sections ?? []).map((label, i) => {
                         const done = !docGenerating;
                         return (
                           <div key={label} className={`flex items-center gap-2 ${done ? "opacity-100" : i === 0 ? "opacity-100" : "opacity-40"}`}>
@@ -1595,21 +1558,21 @@ export function MainApp() {
               </button>
             </div>
             <div className={`px-4 py-4 border-t ${c.border} space-y-2.5`}>
-              {[
-                { label:"Model",  value:"Llama 3.1 8B",    color:"text-indigo-600" },
-                { label:"Vision", value:"Moondream2",       color:"text-violet-600" },
-                { label:"Memory", value:"ChromaDB · Local", color:"text-emerald-600" },
-              ].map(row => (
-                <div key={row.label} className="flex items-center justify-between">
-                  <span className={`text-[10px] font-medium ${c.textFaint}`}>{row.label}</span>
-                  <span className={`text-[10px] font-semibold ${darkMode ? row.color.replace("-600","-400") : row.color}`}>{row.value}</span>
-                </div>
-              ))}
+              <div className="flex items-center justify-between">
+                <span className={`text-[10px] font-medium ${c.textFaint}`}>Memory items</span>
+                <span className={`text-[10px] font-semibold ${darkMode ? "text-indigo-400" : "text-indigo-600"}`}>{memoryItems.length}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className={`text-[10px] font-medium ${c.textFaint}`}>Documents</span>
+                <span className={`text-[10px] font-semibold ${darkMode ? "text-violet-400" : "text-violet-600"}`}>{documents.length}</span>
+              </div>
               <div className="flex items-center justify-between">
                 <span className={`text-[10px] font-medium ${c.textFaint}`}>Status</span>
                 <div className="flex items-center gap-1.5">
-                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                  <span className={`text-[10px] font-semibold ${darkMode ? "text-emerald-400" : "text-emerald-600"}`}>Fully Offline</span>
+                  <div className={`w-1.5 h-1.5 rounded-full ${backendOnline ? "bg-emerald-500" : "bg-amber-500"}`} />
+                  <span className={`text-[10px] font-semibold ${backendOnline ? (darkMode ? "text-emerald-400" : "text-emerald-600") : (darkMode ? "text-amber-400" : "text-amber-600")}`}>
+                    {backendOnline ? "Backend online" : "Backend offline"}
+                  </span>
                 </div>
               </div>
             </div>
@@ -1771,8 +1734,8 @@ export function MainApp() {
                     <Sparkles className="w-4 h-4 text-emerald-500" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className={`text-xs font-medium ${c.text}`}>Llama 3.1 · 8B Q4</p>
-                    <p className={`text-[11px] mt-0.5 ${c.textFaint}`}>3.2 GB / 5.1 GB VRAM · Running locally</p>
+                    <p className={`text-xs font-medium ${c.text}`}>{modelStorage?.has_models ? "Model installed" : "No model installed yet"}</p>
+                    <p className={`text-[11px] mt-0.5 ${c.textFaint}`}>{backendOnline ? "Backend running locally" : "Backend not reachable"}</p>
                   </div>
                   <button
                     onClick={refreshModelStorage}
