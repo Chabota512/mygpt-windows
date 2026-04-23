@@ -1077,6 +1077,8 @@ export function MainApp() {
         {/* Header */}
         <header className={`flex items-center justify-between px-4 py-3 border-b ${c.border} ${c.headerBg}`}>
           <div className="flex items-center gap-3">
+            {/* Logo */}
+            <img src="/logo.png" alt="My_GPT 4 Students" className="w-7 h-7 rounded-md" />
             {!sidebarOpen && (
               <button onClick={() => setSidebarOpen(true)} className={`w-8 h-8 flex items-center justify-center rounded-lg ${c.textMuted} ${c.hoverMuted} transition-colors`}>
                 <PanelLeftOpen className="w-4 h-4" />
