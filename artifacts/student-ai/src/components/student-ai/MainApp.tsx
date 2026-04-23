@@ -2050,27 +2050,46 @@ export function MainApp() {
 
               {/* Custom model path */}
               <section>
-                <h3 className={`text-[11px] uppercase tracking-widest font-semibold mb-3 ${c.textFaint}`}>Custom model location</h3>
+                <h3 className={`text-[11px] uppercase tracking-widest font-semibold mb-3 ${c.textFaint}`}>🎯 How to use local models</h3>
                 <div className={`rounded-xl border ${c.border} ${c.bgMuted} p-3.5 space-y-3`}>
                   <div>
-                    <label className={`text-xs font-medium ${c.text} block mb-2`}>Model folder path</label>
+                    <p className={`text-xs font-medium ${c.text} mb-2`}>Your model folder</p>
+                    <div className={`p-2.5 rounded-lg ${c.bgSub} border ${c.border} font-mono text-[10px] ${c.textBody} break-all`}>
+                      {modelStorage?.model_dir || "Loading..."}
+                    </div>
+                  </div>
+                  
+                  <div className={`rounded-lg ${c.bgSub} border ${c.border} p-2.5 space-y-2`}>
+                    <p className={`text-[11px] font-medium ${c.text}`}>📋 Quick setup:</p>
+                    <ol className={`list-decimal list-inside space-y-1.5 text-[10px] ${c.textBody}`}>
+                      <li><strong>Supported formats:</strong> <code className="font-mono">.gguf</code>, <code className="font-mono">.bin</code>, <code className="font-mono">.safetensors</code>, <code className="font-mono">.pt</code>, <code className="font-mono">.pth</code>, <code className="font-mono">.keras</code>, <code className="font-mono">.pb</code></li>
+                      <li><strong>Copy models</strong> to the folder above (or a custom location)</li>
+                      <li><strong>Refresh</strong> the settings or restart the app</li>
+                      <li><strong>Assign models</strong> to Vision, Reasoning, or Writer roles</li>
+                    </ol>
+                  </div>
+
+                  <div>
+                    <p className={`text-xs font-medium ${c.text} mb-2`}>Custom location</p>
                     <input
                       type="text"
-                      placeholder="e.g., C:\Models or /Volumes/ExternalDrive/models"
+                      placeholder="e.g., C:\\Models or /Volumes/ExternalDrive/models"
                       value={customModelPathInput}
                       onChange={(e) => setCustomModelPathInput(e.target.value)}
                       className={`w-full px-3 py-2 rounded-lg border ${c.border} ${c.card} text-xs font-mono ${c.text} placeholder:${c.textFaint} focus:outline-none focus:ring-1 focus:ring-indigo-500`}
                     />
-                    <p className={`text-[11px] mt-2 ${c.textFaint}`}>
-                      Point to the folder containing your model files. Leave empty to use the default location.
+                    <p className={`text-[10px] mt-1.5 ${c.textFaint}`}>
+                      Point to where you keep your models. Leave empty to use the default location.
                     </p>
                   </div>
+                  
                   <button
                     onClick={handleSaveCustomModelPath}
                     className={`w-full px-3 py-2 rounded-lg text-[11px] font-medium border ${c.border} bg-indigo-600 text-white hover:bg-indigo-700 transition-colors`}
                   >
                     Apply Custom Path
                   </button>
+                  
                   {customModelPath && customModelPath !== customModelPathInput && (
                     <p className={`text-[11px] ${c.textFaint} italic`}>Changes pending. Click "Apply Custom Path" to save.</p>
                   )}
@@ -2197,10 +2216,10 @@ export function MainApp() {
                 
                 {/* Status Card */}
                 {llmStatus && (
-                  <div className={`rounded-xl border ${llmStatus.online ? "border-emerald-500/30 bg-emerald-500/5" : `${c.border} ${c.bgMuted}`} p-3.5 mb-3`}>
+                  <div className={`rounded-xl border ${llmStatus.available_models.length > 0 ? "border-emerald-500/30 bg-emerald-500/5" : `${c.border} ${c.bgMuted}`} p-3.5 mb-3`}>
                     <div className="flex items-center gap-3">
-                      <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${llmStatus.online ? "bg-emerald-500/15" : "bg-amber-500/15"}`}>
-                        {llmStatus.online ? (
+                      <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${llmStatus.available_models.length > 0 ? "bg-emerald-500/15" : "bg-amber-500/15"}`}>
+                        {llmStatus.available_models.length > 0 ? (
                           <CheckCircle2 className="w-4 h-4 text-emerald-500" />
                         ) : (
                           <WifiOff className="w-4 h-4 text-amber-500" />
@@ -2208,12 +2227,14 @@ export function MainApp() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className={`text-xs font-medium ${c.text}`}>
-                          {llmStatus.online ? "Ollama Connected" : "Ollama Offline"}
+                          {llmStatus.available_models.length > 0 ? "Models Available" : "No Models Found"}
                         </p>
                         <p className={`text-[11px] mt-0.5 ${c.textFaint}`}>
-                          {llmStatus.online
-                            ? `${llmStatus.available_models.length} model(s) available`
-                            : "No connection to Ollama"}
+                          {llmStatus.available_models.length > 0
+                            ? `${llmStatus.available_models.length} model(s) ready to assign`
+                            : llmStatus.online
+                            ? "Connected to Ollama but no models pulled yet"
+                            : "Add models to your model folder or connect Ollama"}
                         </p>
                       </div>
                       <button
@@ -2231,7 +2252,7 @@ export function MainApp() {
                 {/* Configuration Inputs */}
                 <div className={`space-y-3 rounded-xl border ${c.border} ${c.bgMuted} p-3.5`}>
                   <div>
-                    <label className={`block text-[11px] font-medium ${c.text} mb-1.5`}>Ollama Host URL</label>
+                    <label className={`block text-[11px] font-medium ${c.text} mb-1.5`}>Ollama Host URL (optional)</label>
                     <input
                       type="text"
                       value={llmConfig?.ollama_host || ""}
@@ -2239,59 +2260,68 @@ export function MainApp() {
                       placeholder="http://localhost:11434"
                       className={`w-full px-2 py-1.5 text-[11px] rounded-lg border ${c.border} ${c.card} ${c.text} focus:outline-none focus:ring-2 focus:ring-indigo-500`}
                     />
-                    <p className={`text-[10px] mt-0.5 ${c.textFaint}`}>URL where Ollama is running (usually localhost:11434)</p>
+                    <p className={`text-[10px] mt-1 ${c.textFaint}`}>
+                      Leave empty if you're only using local models in your folder. Add Ollama's URL to use models pulled from Ollama too.
+                    </p>
                   </div>
 
                   {/* Model Selection */}
-                  {llmStatus?.online && llmStatus.available_models.length > 0 && (
-                    <div className={`rounded-lg border ${c.border} ${c.bgSub} p-2.5 space-y-2`}>
-                      <p className={`text-[11px] font-medium ${c.textBody}`}>Available models to assign:</p>
-                      <div className="flex flex-wrap gap-1.5">
-                        {llmStatus.available_models.map((model) => (
-                          <button
-                            key={model}
-                            onClick={() => {
-                              if (llmConfig) {
-                                // Cycle through roles: vision → reasoning → writer
-                                const current = 
-                                  llmConfig.vision_model === model ? llmConfig.reasoning_model === model ? "writer" : "reasoning"
-                                  : llmConfig.reasoning_model === model ? "writer"
-                                  : llmConfig.writer_model === model ? "vision"
-                                  : "vision";
-                                const updated = { ...llmConfig };
-                                updated[`${current}_model` as keyof typeof updated] = model;
-                                setLlmConfig(updated);
-                              }
-                            }}
-                            className={`px-2 py-1 rounded-md text-[10px] font-medium border transition-all ${
-                              llmConfig?.vision_model === model || llmConfig?.reasoning_model === model || llmConfig?.writer_model === model
-                                ? "bg-indigo-600 text-white border-indigo-600"
-                                : `border ${c.border} ${c.textBody} ${c.hoverMuted}`
-                            }`}
-                            title={`Click to assign to roles. Currently: ${
-                              llmConfig?.vision_model === model ? "Vision" : llmConfig?.reasoning_model === model ? "Reasoning" : llmConfig?.writer_model === model ? "Writer" : "Unassigned"
-                            }`}
-                          >
-                            {model}
-                          </button>
-                        ))}
-                      </div>
+                {llmStatus?.available_models && llmStatus.available_models.length > 0 && (
+                  <div className={`rounded-lg border ${c.border} ${c.bgSub} p-3 space-y-2 mb-3`}>
+                    <p className={`text-[11px] font-medium ${c.textBody}`}>📁 Available models from your folder & Ollama:</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {llmStatus.available_models.map((model) => (
+                        <button
+                          key={model}
+                          onClick={() => {
+                            if (llmConfig) {
+                              // Cycle through roles: vision → reasoning → writer
+                              const current = 
+                                llmConfig.vision_model === model ? llmConfig.reasoning_model === model ? "writer" : "reasoning"
+                                : llmConfig.reasoning_model === model ? "writer"
+                                : llmConfig.writer_model === model ? "vision"
+                                : "vision";
+                              const updated = { ...llmConfig };
+                              updated[`${current}_model` as keyof typeof updated] = model;
+                              setLlmConfig(updated);
+                            }
+                          }}
+                          className={`px-2.5 py-1.5 rounded-md text-[10px] font-medium border transition-all ${
+                            llmConfig?.vision_model === model || llmConfig?.reasoning_model === model || llmConfig?.writer_model === model
+                              ? "bg-indigo-600 text-white border-indigo-600"
+                              : `border ${c.border} ${c.textBody} ${c.hoverMuted}`
+                          }`}
+                          title={`Click to assign. Currently: ${
+                            llmConfig?.vision_model === model ? "Vision, " : ""
+                          }${llmConfig?.reasoning_model === model ? "Reasoning, " : ""}${
+                            llmConfig?.writer_model === model ? "Writer" : ""
+                          }`.replace(/, $/, "") || "Click to assign to a role"}
+                        >
+                          {model}
+                        </button>
+                      ))}
                     </div>
-                  )}
+                    <p className={`text-[10px] ${c.textFaint}`}>
+                      💡 Click any model to cycle through roles: Vision → Reasoning → Writer
+                    </p>
+                  </div>
+                )}
 
                   {/* Advanced Configuration */}
                   <details className={`group/adv`}>
                     <summary className={`cursor-pointer text-[11px] font-medium ${c.textBody} ${c.hoverMuted} list-none flex items-center gap-1.5 select-none`}>
                       <ChevronRight className="w-3 h-3 transition-transform group-open/adv:rotate-90" />
-                      Model assignments (advanced)
+                      Manual model assignment (advanced)
                     </summary>
                     <div className={`mt-2 space-y-2`}>
+                      <p className={`text-[10px] ${c.textFaint}`}>Or type model names directly. Can be the same model multiple times.</p>
                       <div>
                         <label className={`block text-[10px] font-medium ${c.textMuted} mb-0.5`}>Vision (for images)</label>
                         <input
                           type="text"
                           value={llmConfig?.vision_model || ""}
                           onChange={(e) => llmConfig && setLlmConfig({ ...llmConfig, vision_model: e.target.value })}
+                          placeholder="model-name"
                           className={`w-full px-2 py-1 text-[10px] rounded-lg border ${c.border} ${c.card} ${c.text} focus:outline-none focus:ring-1 focus:ring-indigo-500`}
                         />
                       </div>
@@ -2301,6 +2331,7 @@ export function MainApp() {
                           type="text"
                           value={llmConfig?.reasoning_model || ""}
                           onChange={(e) => llmConfig && setLlmConfig({ ...llmConfig, reasoning_model: e.target.value })}
+                          placeholder="model-name"
                           className={`w-full px-2 py-1 text-[10px] rounded-lg border ${c.border} ${c.card} ${c.text} focus:outline-none focus:ring-1 focus:ring-indigo-500`}
                         />
                       </div>
@@ -2310,6 +2341,7 @@ export function MainApp() {
                           type="text"
                           value={llmConfig?.writer_model || ""}
                           onChange={(e) => llmConfig && setLlmConfig({ ...llmConfig, writer_model: e.target.value })}
+                          placeholder="model-name"
                           className={`w-full px-2 py-1 text-[10px] rounded-lg border ${c.border} ${c.card} ${c.text} focus:outline-none focus:ring-1 focus:ring-indigo-500`}
                         />
                       </div>

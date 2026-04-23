@@ -368,15 +368,41 @@ OLLAMA_NUM_CTX        = int(os.environ.get("OLLAMA_NUM_CTX", "4096"))
 OLLAMA_DEBATE_ROUNDS  = max(0, int(os.environ.get("OLLAMA_DEBATE_ROUNDS", "1")))
 
 # ── Detect available models and set up fallbacks ──
+def _scan_local_models() -> set[str]:
+    """Scan the local model directory for model files."""
+    model_names = set()
+    model_extensions = {'.gguf', '.bin', '.safetensors', '.pt', '.pth', '.keras', '.pb'}
+    
+    try:
+        if MODEL_DIR.exists():
+            for file_path in MODEL_DIR.rglob("*"):
+                if file_path.is_file() and file_path.suffix.lower() in model_extensions:
+                    # Use filename without extension as model name
+                    model_names.add(file_path.stem)
+    except Exception:
+        pass
+    
+    return model_names
+
+
 def _get_available_models() -> set[str]:
-    """Query Ollama for list of available models."""
+    """Query Ollama for list of available models and scan local folder."""
+    models = set()
+    
+    # Scan local model directory
+    models.update(_scan_local_models())
+    
+    # Query Ollama for additional models
     try:
         import ollama
         client = ollama.Client(host=OLLAMA_HOST)
-        models = client.list()
-        return {m.model.split(":")[0] for m in models.models} if models.models else set()
+        ollama_models = client.list()
+        if ollama_models.models:
+            models.update({m.model.split(":")[0] for m in ollama_models.models})
     except Exception:
-        return set()
+        pass
+    
+    return models
 
 def _resolve_model_for_role(preferred: str, available_models: set[str], fallback: str) -> str:
     """
@@ -1365,74 +1391,78 @@ def set_llm_config(cfg: LLMConfig):
 
 @app.post("/llm-test", response_model=LLMTestResult)
 def test_llm_connection(cfg: LLMConfig):
-    """Test connection to Ollama and list available models."""
+    """Test connection to Ollama and list available models (local + Ollama)."""
+    models_set = set()
+    
+    # Always include local models
+    models_set.update(_scan_local_models())
+    
+    # Try to get Ollama models too
+    ollama_online = False
     try:
         import requests
         
-        # Test basic connectivity
         health_url = f"{cfg.ollama_host}/api/tags"
         response = requests.get(health_url, timeout=5)
         
-        if response.status_code != 200:
-            return LLMTestResult(
-                success=False,
-                message=f"Ollama not responding (HTTP {response.status_code}). Make sure Ollama is running.",
-            )
-        
-        # Get available models
-        data = response.json()
-        models = [m.get("name", "") for m in data.get("models", [])]
-        
-        if not models:
-            return LLMTestResult(
-                success=True,
-                message="Connected to Ollama, but no models found. Pull some models with `ollama pull <model>`.",
-                available_models=models,
-            )
-        
+        if response.status_code == 200:
+            ollama_online = True
+            data = response.json()
+            ollama_models = [m.get("name", "") for m in data.get("models", [])]
+            models_set.update(ollama_models)
+    except Exception:
+        pass
+    
+    models_list = sorted(list(models_set))
+    
+    if not models_list:
+        return LLMTestResult(
+            success=False,
+            message="No models found. Add model files to your model folder or pull them with `ollama pull <model>`.",
+            available_models=models_list,
+        )
+    
+    if ollama_online:
         return LLMTestResult(
             success=True,
-            message=f"✓ Connected! Found {len(models)} model(s) available.",
-            available_models=sorted(models),
+            message=f"✓ Found {len(models_list)} model(s) available.",
+            available_models=models_list,
         )
-    except requests.ConnectionError:
+    else:
         return LLMTestResult(
-            success=False,
-            message=f"Cannot reach Ollama at {cfg.ollama_host}. Is it running?",
-        )
-    except requests.Timeout:
-        return LLMTestResult(
-            success=False,
-            message=f"Connection to Ollama timed out. Check your host URL and internet.",
-        )
-    except Exception as e:
-        return LLMTestResult(
-            success=False,
-            message=f"Error testing Ollama: {str(e)}",
+            success=True,
+            message=f"✓ Found {len(models_list)} model(s) in local folder.",
+            available_models=models_list,
         )
 
 
 @app.get("/llm-status", response_model=LLMStatus)
 def get_llm_status():
-    """Get current LLM status (config + online check)."""
+    """Get current LLM status (config + available models from local folder + Ollama)."""
     cfg = load_llm_config()
     cfg.ollama_host = os.environ.get("OLLAMA_HOST", cfg.ollama_host)
     cfg.vision_model = os.environ.get("OLLAMA_VISION_MODEL", cfg.vision_model)
     cfg.reasoning_model = os.environ.get("OLLAMA_REASONING_MODEL", cfg.reasoning_model)
     cfg.writer_model = os.environ.get("OLLAMA_WRITER_MODEL", cfg.writer_model)
     
-    available_models = []
+    available_models_set = set()
     online = False
     
+    # Always scan local models
+    available_models_set.update(_scan_local_models())
+    
+    # Try to get Ollama models
     try:
         import requests
         response = requests.get(f"{cfg.ollama_host}/api/tags", timeout=2)
         if response.status_code == 200:
             online = True
             data = response.json()
-            available_models = sorted([m.get("name", "") for m in data.get("models", [])])
+            available_models_set.update([m.get("name", "") for m in data.get("models", [])])
     except Exception:
         pass
+    
+    available_models = sorted(list(available_models_set))
     
     return LLMStatus(
         ollama_host=cfg.ollama_host,
