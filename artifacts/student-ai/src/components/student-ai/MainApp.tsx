@@ -493,9 +493,7 @@ export function MainApp() {
         {
           id: Date.now() + 1, role: "assistant",
           content:
-            "Hmm, I lost my train of thought for a moment 😅\n\n" +
-            "Please give it a second and try again. If it keeps happening, " +
-            "close and reopen the app — that usually fixes it.",
+            "Unable to reach the server. Please check your connection and try again.",
           timestamp: nowStamp(),
         },
       ]);
