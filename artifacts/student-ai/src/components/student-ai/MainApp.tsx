@@ -344,9 +344,17 @@ export function MainApp() {
   /* Empty / first-run chat & thinking state */
   const [isEmptyChat, setIsEmptyChat] = useState(true);
   const [isThinking, setIsThinking] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const chatScrollRef = useRef<HTMLDivElement | null>(null);
+
 
   /* ─── Backend wiring (local Python FastAPI on http://localhost:8000) ─── */
   const [messages, setMessages] = useState<Message[]>([]);
+  useEffect(() => {
+    const el = chatScrollRef.current;
+    if (!el) return;
+    el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+  }, [messages, isThinking, /* re-scroll on doc gen too */]);
   const [backendError, setBackendError] = useState<string | null>(null);
   const [backendOnline, setBackendOnline] = useState<boolean>(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -1148,7 +1156,7 @@ export function MainApp() {
 
         ) : (
           /* ── CHAT VIEW ── */
-          <div className="flex-1 overflow-y-auto px-6 py-6 space-y-6">
+          <div ref={chatScrollRef} className="flex-1 overflow-y-auto px-6 py-6 space-y-6">
             {/* Onboarding nudge */}
             {showOnboarding && (
               <div className={`flex items-center gap-3 px-4 py-3 rounded-xl border ${c.memBannerBg}`} role="region" aria-label="Profile setup">
@@ -1366,6 +1374,7 @@ export function MainApp() {
                 </div>
               </div>
             )}
+            <div ref={messagesEndRef} />
             </>
             )}
           </div>
