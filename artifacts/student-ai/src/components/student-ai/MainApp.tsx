@@ -410,32 +410,51 @@ export function MainApp() {
   }, []);
 
   useEffect(() => {
-    (async () => {
-      const list = await refreshSessions();
-      await refreshMemory();
-      await refreshDocuments();
+    let retryTimeout: NodeJS.Timeout | null = null;
+    let attempt = 0;
+    const maxAttempts = 20; // ~30 seconds with exponential backoff
+    
+    const loadAppData = async () => {
+      attempt++;
       try {
-        const p = await api.getProfile();
-        const isDefault = (!p.name || p.name === DEFAULT_PROFILE.name) && !p.career && !p.avatar;
-        if (!isDefault) setProfile({ name: p.name, career: p.career, avatar: p.avatar });
-      } catch { /* offline — keep localStorage profile */ }
-      if (list.length > 0) {
-        const first = list[0];
-        setCurrentSessionId(first.id);
-        setActiveChat(first.label);
+        const list = await refreshSessions();
+        await refreshMemory();
+        await refreshDocuments();
         try {
-          const msgs = await api.getMessages(first.id);
-          if (msgs.length > 0) {
-            setMessages(msgs.map((m, i) => ({
-              id: i + 1, role: m.role, content: m.content, timestamp: nowStamp(),
-            })));
-            setIsEmptyChat(false);
-          } else {
-            setIsEmptyChat(true);
-          }
-        } catch (err) { reportError(err); }
+          const p = await api.getProfile();
+          const isDefault = (!p.name || p.name === DEFAULT_PROFILE.name) && !p.career && !p.avatar;
+          if (!isDefault) setProfile({ name: p.name, career: p.career, avatar: p.avatar });
+        } catch { /* offline — keep localStorage profile */ }
+        if (list.length > 0) {
+          const first = list[0];
+          setCurrentSessionId(first.id);
+          setActiveChat(first.label);
+          try {
+            const msgs = await api.getMessages(first.id);
+            if (msgs.length > 0) {
+              setMessages(msgs.map((m, i) => ({
+                id: i + 1, role: m.role, content: m.content, timestamp: nowStamp(),
+              })));
+              setIsEmptyChat(false);
+            } else {
+              setIsEmptyChat(true);
+            }
+          } catch (err) { reportError(err); }
+        }
+      } catch (err) {
+        // Backend not ready yet — retry with exponential backoff
+        if (attempt < maxAttempts) {
+          const delay = Math.min(1000 * Math.pow(1.5, attempt - 1), 5000); // Cap at 5s
+          retryTimeout = window.setTimeout(loadAppData, delay);
+        }
       }
-    })();
+    };
+    
+    loadAppData();
+    
+    return () => {
+      if (retryTimeout) clearTimeout(retryTimeout);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
