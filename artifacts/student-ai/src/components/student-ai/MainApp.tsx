@@ -220,11 +220,25 @@ export function MainApp() {
   const [darkMode, setDarkMode] = useState(true);
   const [input, setInput] = useState("");
   const [activeTab, setActiveTab] = useState<"chat" | "memory" | "docs">("chat");
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState<boolean>(() => {
+    if (typeof window === "undefined") return true;
+    const v = window.localStorage.getItem("student-ai-sidebar-open");
+    return v === null ? true : v === "1";
+  });
+  useEffect(() => {
+    try { window.localStorage.setItem("student-ai-sidebar-open", sidebarOpen ? "1" : "0"); } catch {}
+  }, [sidebarOpen]);
   const [activeChat, setActiveChat] = useState("New Chat");
   const [toolsOpen, setToolsOpen] = useState(false);
   const [activeTool, setActiveTool] = useState<string | null>(null);
-  const [rightOpen, setRightOpen] = useState(true);
+  const [rightOpen, setRightOpen] = useState<boolean>(() => {
+    if (typeof window === "undefined") return true;
+    const v = window.localStorage.getItem("student-ai-right-open");
+    return v === null ? true : v === "1";
+  });
+  useEffect(() => {
+    try { window.localStorage.setItem("student-ai-right-open", rightOpen ? "1" : "0"); } catch {}
+  }, [rightOpen]);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
 
