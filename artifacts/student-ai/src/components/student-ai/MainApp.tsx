@@ -23,7 +23,7 @@ import {
   User as UserIcon, Camera, Trash2, Pencil, Sparkles, Keyboard, Check,
   HardDrive, Usb, Phone, MessageCircle, Heart,
 } from "lucide-react";
-import { getGMT2Time, getGMT2DateTime, formatToGMT2 } from "../lib/utils";
+import { getGMT2Time, getGMT2DateTime, formatToGMT2 } from "../../lib/utils";
 
 type UserProfile = { name: string; career: string; avatar: string | null };
 const PROFILE_STORAGE_KEY = "student-ai-user-profile";
