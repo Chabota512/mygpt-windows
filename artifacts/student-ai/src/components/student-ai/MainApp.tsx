@@ -752,8 +752,8 @@ export function MainApp() {
       if (tauri) {
         const result = await tauri.invoke("restart_ollama_command");
         setLlmTestMsg(`✓ ${result}`);
-        // Wait a moment and refresh status
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        // Wait for restart to complete (2 sec sleep + 1 sec buffer)
+        await new Promise(resolve => setTimeout(resolve, 3500));
         await refreshLLMStatus();
       } else {
         // Fallback: just test connection

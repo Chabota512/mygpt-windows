@@ -11,11 +11,46 @@ pub struct AppState {
 }
 
 #[tauri::command]
-async fn restart_ollama_command(state: tauri::State<'_, AppState>, app: tauri::AppHandle) -> Result<String, String> {
+fn restart_ollama_command(state: tauri::State<'_, AppState>, app: tauri::AppHandle) -> Result<String, String> {
     let mut state_guard = state.backend.lock().unwrap();
-    match &mut *state_guard {
-        Some(handles) => backend::restart_ollama(handles, &app).await,
-        None => Err("Backend not initialized".to_string()),
+    
+    if let Some(handles) = &mut *state_guard {
+        // Spawn the restart as a background task
+        let app_clone = app.clone();
+        
+        // Kill existing Ollama process if running
+        if let Some(child) = handles.ollama.take() {
+            let _ = child.kill();
+            eprintln!("[mygpt] terminated ollama service for restart");
+        }
+        
+        // Drop the lock before spawning async task
+        drop(state_guard);
+        
+        // Spawn async restart in background
+        tauri::async_runtime::spawn(async move {
+            tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+            let mut state_guard = app_clone.state::<AppState>().backend.lock().unwrap();
+            if let Some(handles) = &mut *state_guard {
+                match backend::start_ollama(&app_clone).await {
+                    Some(child) => {
+                        handles.ollama = Some(child);
+                        eprintln!("[mygpt] ollama restarted successfully");
+                    }
+                    None => {
+                        if !(tokio::net::TcpStream::connect(("127.0.0.1", 11434)).await.is_ok()) {
+                            eprintln!("[mygpt] failed to restart ollama");
+                        } else {
+                            eprintln!("[mygpt] ollama already running on port 11434");
+                        }
+                    }
+                }
+            }
+        });
+        
+        Ok("Restarting Ollama in background...".to_string())
+    } else {
+        Err("Backend not initialized".to_string())
     }
 }
 
