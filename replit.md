@@ -31,5 +31,6 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 - `artifacts/mockup-sandbox` — canvas/design sandbox (kept for reference).
 - `artifacts/api-server` — Express API scaffold (unused by student-ai; kept from template).
 - `python-backend/` — FastAPI + SQLite backend, the real "brain".
+- `desktop/` — Tauri shell that packages the React UI + Python backend into a native Windows `.exe`. The Python backend is bundled with PyInstaller as a sidecar and Ollama is auto-spawned in the background using the user's portable model directory at `C:\dev\my-gpt\python-backend\models`. Models: vision=`qwen3.5:0.8b`, reasoning=`phi4-mini`, writer=`llama3.2:1b`. Build via GitHub Actions (`.github/workflows/desktop-windows.yml`) or locally on Windows with `pnpm --filter mygpt-desktop run build:all`.
 
 See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and package details.

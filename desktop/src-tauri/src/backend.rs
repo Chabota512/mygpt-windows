@@ -1,0 +1,110 @@
+// Manages the lifecycle of the bundled Python FastAPI backend (mygpt-backend.exe)
+// and the Ollama serve process. Both are started silently in the background when
+// the Tauri app launches, and killed when the window closes.
+
+use std::time::Duration;
+use tauri::AppHandle;
+use tauri_plugin_shell::process::CommandChild;
+use tauri_plugin_shell::ShellExt;
+use tokio::time::sleep;
+
+const BACKEND_PORT: u16 = 8000;
+const OLLAMA_PORT: u16 = 11434;
+const PORTABLE_MODELS_DIR: &str = r"C:\dev\my-gpt\python-backend\models";
+
+const VISION_MODEL: &str = "qwen3.5:0.8b";
+const REASONING_MODEL: &str = "phi4-mini";
+const WRITER_MODEL: &str = "llama3.2:1b";
+
+pub struct BackendHandles {
+    pub backend: Option<CommandChild>,
+    pub ollama: Option<CommandChild>,
+}
+
+pub async fn start_all(app: &AppHandle) -> Result<BackendHandles, String> {
+    let ollama = start_ollama(app).await;
+    let backend = start_backend(app).await?;
+    Ok(BackendHandles { backend: Some(backend), ollama })
+}
+
+async fn start_ollama(app: &AppHandle) -> Option<CommandChild> {
+    if is_port_open(OLLAMA_PORT).await {
+        eprintln!("[mygpt] ollama already running on :{}", OLLAMA_PORT);
+        return None;
+    }
+
+    let cmd = app
+        .shell()
+        .command("ollama")
+        .args(["serve"])
+        .env("OLLAMA_MAX_LOADED_MODELS", "1")
+        .env("OLLAMA_NUM_PARALLEL", "1")
+        .env("OLLAMA_MODELS", PORTABLE_MODELS_DIR);
+
+    match cmd.spawn() {
+        Ok((_rx, child)) => {
+            eprintln!("[mygpt] spawned ollama serve");
+            // Give Ollama a moment to bind its port before the backend starts.
+            wait_for_port(OLLAMA_PORT, Duration::from_secs(15)).await;
+            Some(child)
+        }
+        Err(e) => {
+            eprintln!("[mygpt] could not spawn ollama (is it installed?): {e}");
+            None
+        }
+    }
+}
+
+async fn start_backend(app: &AppHandle) -> Result<CommandChild, String> {
+    if is_port_open(BACKEND_PORT).await {
+        return Err(format!(
+            "Port {} is already in use — another instance of the backend may be running.",
+            BACKEND_PORT
+        ));
+    }
+
+    let cmd = app
+        .shell()
+        .sidecar("mygpt-backend")
+        .map_err(|e| format!("sidecar lookup failed: {e}"))?
+        .env("OLLAMA_HOST", format!("http://127.0.0.1:{}", OLLAMA_PORT))
+        .env("OLLAMA_VISION_MODEL", VISION_MODEL)
+        .env("OLLAMA_REASONING_MODEL", REASONING_MODEL)
+        .env("OLLAMA_WRITER_MODEL", WRITER_MODEL)
+        .env("OLLAMA_MAX_LOADED_MODELS", "1")
+        .env("MYGPT_HOST", "127.0.0.1")
+        .env("MYGPT_PORT", BACKEND_PORT.to_string());
+
+    let (_rx, child) = cmd.spawn().map_err(|e| format!("spawn failed: {e}"))?;
+    eprintln!("[mygpt] spawned mygpt-backend");
+    wait_for_port(BACKEND_PORT, Duration::from_secs(30)).await;
+    Ok(child)
+}
+
+pub fn stop_all(handles: BackendHandles) {
+    if let Some(child) = handles.backend {
+        let _ = child.kill();
+        eprintln!("[mygpt] killed backend");
+    }
+    if let Some(child) = handles.ollama {
+        let _ = child.kill();
+        eprintln!("[mygpt] killed ollama");
+    }
+}
+
+async fn is_port_open(port: u16) -> bool {
+    tokio::net::TcpStream::connect(("127.0.0.1", port))
+        .await
+        .is_ok()
+}
+
+async fn wait_for_port(port: u16, timeout: Duration) {
+    let start = std::time::Instant::now();
+    while start.elapsed() < timeout {
+        if is_port_open(port).await {
+            return;
+        }
+        sleep(Duration::from_millis(300)).await;
+    }
+    eprintln!("[mygpt] timed out waiting for port {}", port);
+}

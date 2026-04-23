@@ -21,6 +21,7 @@ Plugging in Ollama (real offline LLM) — see README.md.
 from __future__ import annotations
 
 import os
+import sys
 import re
 import sqlite3
 import uuid
@@ -356,7 +357,7 @@ def _bump_session(session_id: str) -> None:
 os.environ.setdefault("OLLAMA_MAX_LOADED_MODELS", "1")
 
 OLLAMA_HOST           = os.environ.get("OLLAMA_HOST", "http://localhost:11434")
-OLLAMA_VISION_MODEL   = os.environ.get("OLLAMA_VISION_MODEL",   "qwen2.5vl:3b")
+OLLAMA_VISION_MODEL   = os.environ.get("OLLAMA_VISION_MODEL",   "qwen3.5:0.8b")
 OLLAMA_REASONING_MODEL = os.environ.get("OLLAMA_REASONING_MODEL", "phi4-mini")
 OLLAMA_WRITER_MODEL   = os.environ.get("OLLAMA_WRITER_MODEL",   "llama3.2:1b")
 OLLAMA_NUM_CTX        = int(os.environ.get("OLLAMA_NUM_CTX", "4096"))
@@ -1263,5 +1264,15 @@ def put_profile(p: Profile):
 # Entry point
 # ──────────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", "8000"))
-    uvicorn.run("main:app", host="127.0.0.1", port=port, reload=True)
+    # Honor the env vars set by the Tauri shell when running as a packaged
+    # sidecar (MYGPT_HOST / MYGPT_PORT). Falls back to PORT for legacy/dev use.
+    host = os.environ.get("MYGPT_HOST", "127.0.0.1")
+    port = int(os.environ.get("MYGPT_PORT") or os.environ.get("PORT") or "8000")
+    # `reload=True` requires the import-string form and the source on disk —
+    # neither is true inside a PyInstaller bundle, so we disable it whenever
+    # we're running frozen.
+    is_frozen = getattr(sys, "frozen", False)
+    if is_frozen:
+        uvicorn.run(app, host=host, port=port, log_level="info")
+    else:
+        uvicorn.run("main:app", host=host, port=port, reload=True)
