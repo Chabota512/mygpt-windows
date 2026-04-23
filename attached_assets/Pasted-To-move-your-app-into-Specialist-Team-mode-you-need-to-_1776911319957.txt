@@ -1,0 +1,29 @@
+To move your app into "Specialist Team" mode, you need to tell Replit AI to stop treating the AI as a single chatbot and start treating it as an **Orchestrator**.
+
+Since you are on an 8GB machine, the most important instruction is to ensure Replit **swaps** models instead of trying to run them all at once.
+
+### Copy and Paste this prompt to Replit AI:
+
+> "I have 8GB of RAM and am running Ollama locally. I have downloaded three specific models for my Mechatronics assistant: **qwen3.5:0.8b** (Vision), **phi4-mini** (Math/Logic), and **llama3.2:1b** (Writing).
+>
+> Please modify my Python backend to implement a **Task Router**:
+>
+> 1. **Environment Config:** Set `OLLAMA_MAX_LOADED_MODELS=1` in the backend environment so only one model is in RAM at a time.
+> 2. **Vision Logic:** If the user uploads an image, use `qwen3.5:0.8b`. Have it describe the image in technical detail.
+> 3. **Reasoning Logic:** If the prompt involves math, physics, or code, take the Vision description (if any) and the user prompt, and send it to `phi4-mini`.
+> 4. **Formatting Logic:** Use `llama3.2:1b` to take the raw output from the other models and format it into a clean, professional academic response or report.
+> 5. **API Settings:** For all calls, set `num_ctx` to `4096` to keep memory usage stable on my i5 CPU."
+
+---
+
+### Why this works for your development:
+
+* **RAM Management:** By setting `MAX_LOADED_MODELS=1`, your laptop will "forget" the Vision model as soon as it's done and "load" the Math model. This prevents the **500 Internal Server Error** you saw earlier.
+* **Specialized Accuracy:** `phi4-mini` is significantly better at the math you'll face in Mechatronics (like Laplace transforms or PID tuning) than a general model. 
+* **The "Agent" Feel:** To the user, it will look like one very smart AI. Under the hood, your React frontend will show different stages: *"Analyzing image..."* $\rightarrow$ *"Calculating physics..."* $\rightarrow$ *"Formatting report..."*
+
+### 💡 Pro Tip for Replit:
+If Replit asks how to connect to your local Ollama, tell it: 
+> "Use the `ollama-python` library and connect to `http://localhost:11434`. Since I am running the portable version, the backend should expect the server to be running on my local machine."
+
+How does that sound for the next phase of your app?

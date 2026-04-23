@@ -36,6 +36,8 @@ export type ApiChatResponse = {
   timestamp: string;
   model: string;
   session_id: string;
+  stages?: string[];
+  model_used?: string | null;
 };
 
 async function j<T>(r: Response): Promise<T> {
@@ -71,11 +73,19 @@ export const api = {
     fetch(`${API_BASE}/sessions/${id}/messages`).then(j<ApiMessage[]>),
 
   // ── Chat ───────────────────────────────────────────────────
-  chat: (message: string, session_id?: string | null) =>
+  chat: (
+    message: string,
+    session_id?: string | null,
+    attachment_ids?: string[] | null,
+  ) =>
     fetch(`${API_BASE}/chat`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message, session_id: session_id ?? null }),
+      body: JSON.stringify({
+        message,
+        session_id: session_id ?? null,
+        attachment_ids: attachment_ids ?? null,
+      }),
     }).then(j<ApiChatResponse>),
 
   // ── Memory / uploads ───────────────────────────────────────

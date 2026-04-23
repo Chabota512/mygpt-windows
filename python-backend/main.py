@@ -213,6 +213,7 @@ class ChatMsg(BaseModel):
 class ChatRequest(BaseModel):
     message: str
     session_id: Optional[str] = None
+    attachment_ids: Optional[List[str]] = None  # memory_item ids (images) to feed the vision model
 
 
 class ChatResponse(BaseModel):
@@ -220,6 +221,8 @@ class ChatResponse(BaseModel):
     timestamp: str
     model: str
     session_id: str
+    stages: List[str] = []          # human-readable steps the router took
+    model_used: Optional[str] = None  # final model that produced the reply
 
 
 class SessionOut(BaseModel):
@@ -335,22 +338,214 @@ def _bump_session(session_id: str) -> None:
         )
 
 
-def _llm_reply(message: str, history: List[ChatMsg]) -> str:
-    """
-    Local-LLM call. Returns a stub today; swap with Ollama on the user's PC.
+# ──────────────────────────────────────────────────────────────────────
+# Specialist Team — Task Router
+# ──────────────────────────────────────────────────────────────────────
+# We run THREE small, specialised local models through Ollama. Only ONE
+# is in RAM at a time (OLLAMA_MAX_LOADED_MODELS=1) so an 8 GB machine
+# can swap between them safely.
+#
+#   Vision     → describes any uploaded image in technical detail
+#   Reasoning  → math / physics / code (Mechatronics-friendly)
+#   Writer     → formats the final answer cleanly
+#
+# Defaults match the user's spec but every model + the Ollama host can
+# be overridden with environment variables, so you can swap to whatever
+# you've actually pulled with `ollama pull ...` without touching code.
+# ──────────────────────────────────────────────────────────────────────
+os.environ.setdefault("OLLAMA_MAX_LOADED_MODELS", "1")
 
-    --- Replace this body with: ----------------------------------------
-    import ollama
-    msgs = [{"role": m.role, "content": m.content} for m in history]
-    msgs.append({"role": "user", "content": message})
-    out = ollama.chat(model="llama3", messages=msgs)
-    return out["message"]["content"]
-    --------------------------------------------------------------------
-    """
-    return (
-        f"(local stub) I received: \"{message.strip()}\".\n\n"
-        "Plug in Ollama in main.py to get real answers — see README.md."
+OLLAMA_HOST           = os.environ.get("OLLAMA_HOST", "http://localhost:11434")
+OLLAMA_VISION_MODEL   = os.environ.get("OLLAMA_VISION_MODEL",   "qwen2.5vl:3b")
+OLLAMA_REASONING_MODEL = os.environ.get("OLLAMA_REASONING_MODEL", "phi4-mini")
+OLLAMA_WRITER_MODEL   = os.environ.get("OLLAMA_WRITER_MODEL",   "llama3.2:1b")
+OLLAMA_NUM_CTX        = int(os.environ.get("OLLAMA_NUM_CTX", "4096"))
+
+_REASONING_HINTS = re.compile(
+    r"(?ix)"
+    r"(?:^|\b)("
+    r"calculate|solve|prove|integrate|derivative|differentiat|equation|equations?|"
+    r"matrix|matrices|laplace|fourier|transform|pid|tuning|circuit|voltage|current|"
+    r"resistance|impedance|torque|force|velocity|acceleration|kinematic|dynamic|"
+    r"physics|chemistry|formula|theorem|algorithm|big[- ]?o|complexity|"
+    r"function|variable|loop|class|method|stack|trace|debug|compile|runtime|"
+    r"python|java(?:script)?|typescript|c\+\+|c#|rust|sql|regex"
+    r")\b"
+)
+_CODE_FENCE = re.compile(r"```|`[^`]+`")
+_MATH_SYMBOLS = re.compile(r"[=+\-*/^∫∑√π°][\s\d(]|[0-9]\s*[+\-*/^=]\s*[0-9]")
+
+
+def _is_reasoning_task(message: str) -> bool:
+    if _CODE_FENCE.search(message):
+        return True
+    if _MATH_SYMBOLS.search(message):
+        return True
+    return bool(_REASONING_HINTS.search(message))
+
+
+def _ollama_chat(
+    model: str,
+    messages: list[dict],
+    images: Optional[list[str]] = None,
+) -> str:
+    """Single Ollama call with our standard options. Raises on failure."""
+    import ollama  # lazy import so dev/test can run without it
+    client = ollama.Client(host=OLLAMA_HOST)
+    if images and messages:
+        # Attach images to the LAST user message (Ollama convention)
+        for m in reversed(messages):
+            if m.get("role") == "user":
+                m["images"] = images
+                break
+    out = client.chat(
+        model=model,
+        messages=messages,
+        options={"num_ctx": OLLAMA_NUM_CTX},
+        stream=False,
     )
+    return (out.get("message") or {}).get("content", "").strip()
+
+
+def _resolve_image_paths(attachment_ids: list[str]) -> list[str]:
+    if not attachment_ids:
+        return []
+    paths: list[str] = []
+    with db() as c:
+        q_marks = ",".join("?" * len(attachment_ids))
+        rows = c.execute(
+            f"SELECT path, kind FROM memory_items WHERE id IN ({q_marks})",
+            attachment_ids,
+        ).fetchall()
+    for r in rows:
+        if r["kind"] == "image" and Path(r["path"]).exists():
+            paths.append(r["path"])
+    return paths
+
+
+def _route_task(
+    message: str,
+    history: List[ChatMsg],
+    image_paths: Optional[list[str]] = None,
+) -> tuple[str, list[str], str]:
+    """
+    Picks the right specialist(s) for this task and returns
+    (final_reply, stages, final_model_used).
+
+    Falls back to the offline stub if Ollama isn't installed / reachable.
+    """
+    image_paths = image_paths or []
+    stages: list[str] = []
+
+    try:
+        import ollama  # noqa: F401
+    except ImportError:
+        return (
+            f"(offline stub) I received: \"{message.strip()}\".\n\n"
+            "Install Ollama and `pip install ollama` to enable the local AI "
+            "specialists — see README.md.",
+            ["Offline stub (no Ollama installed)"],
+            "stub",
+        )
+
+    base_history = [{"role": m.role, "content": m.content} for m in history]
+
+    try:
+        # ── Step 1 · Vision (only if an image is attached) ─────────
+        vision_desc = ""
+        if image_paths:
+            stages.append(f"Analyzing image with {OLLAMA_VISION_MODEL}…")
+            vision_desc = _ollama_chat(
+                OLLAMA_VISION_MODEL,
+                [
+                    {
+                        "role": "system",
+                        "content": (
+                            "You are a technical vision assistant. Describe the "
+                            "image in precise, factual detail: text shown, "
+                            "diagrams, equations, components, measurements. Be "
+                            "concise but complete. Do not speculate."
+                        ),
+                    },
+                    {"role": "user", "content": message or "Describe this image."},
+                ],
+                images=image_paths,
+            )
+
+        # ── Step 2 · Pick the next specialist ──────────────────────
+        use_reasoning = _is_reasoning_task(message) or bool(vision_desc)
+        reasoning_out = ""
+        if use_reasoning:
+            stages.append(f"Reasoning with {OLLAMA_REASONING_MODEL}…")
+            user_block = message
+            if vision_desc:
+                user_block = (
+                    f"Image description (from vision specialist):\n{vision_desc}\n\n"
+                    f"User question:\n{message}"
+                )
+            reasoning_out = _ollama_chat(
+                OLLAMA_REASONING_MODEL,
+                base_history + [
+                    {
+                        "role": "system",
+                        "content": (
+                            "You are a careful STEM reasoning assistant for a "
+                            "Mechatronics student. Show working step-by-step. "
+                            "Keep units. Prefer correctness over brevity."
+                        ),
+                    },
+                    {"role": "user", "content": user_block},
+                ],
+            )
+
+        # ── Step 3 · Writer / formatter ─────────────────────────────
+        # If we already have a reasoning answer, polish it.
+        # Otherwise this is a plain writing/chat turn — answer directly.
+        stages.append(f"Formatting with {OLLAMA_WRITER_MODEL}…")
+        if reasoning_out:
+            writer_msgs = base_history + [
+                {
+                    "role": "system",
+                    "content": (
+                        "You are an academic writing assistant. Take the draft "
+                        "below and rewrite it as a clean, well-structured "
+                        "answer for a student. Preserve every number, equation "
+                        "and step. Use short paragraphs, headings or bullets "
+                        "where helpful. Do NOT add new facts."
+                    ),
+                },
+                {"role": "user", "content": f"Draft to polish:\n\n{reasoning_out}"},
+            ]
+        else:
+            writer_msgs = base_history + [
+                {
+                    "role": "system",
+                    "content": (
+                        "You are a friendly study assistant for a student. "
+                        "Answer clearly and concisely in plain language."
+                    ),
+                },
+                {"role": "user", "content": message},
+            ]
+
+        final = _ollama_chat(OLLAMA_WRITER_MODEL, writer_msgs)
+        if not final:
+            # Writer produced nothing — fall back to the upstream output
+            final = reasoning_out or vision_desc or "(no response)"
+        return final, stages, OLLAMA_WRITER_MODEL
+
+    except Exception as e:
+        print(f"[router] Ollama call failed: {e}")
+        # Graceful fallback so the UI never crashes
+        return (
+            "I couldn't reach the local AI just now.\n\n"
+            f"• Make sure Ollama is running (`ollama serve`).\n"
+            f"• Make sure you've pulled: `{OLLAMA_VISION_MODEL}`, "
+            f"`{OLLAMA_REASONING_MODEL}`, `{OLLAMA_WRITER_MODEL}`.\n"
+            f"• Technical detail: {e}",
+            stages + ["Failed — see message"],
+            "error",
+        )
 
 
 # ──────────────────────────────────────────────────────────────────────
@@ -457,7 +652,8 @@ def chat(req: ChatRequest):
         ).fetchall()
     history = [ChatMsg(role=r["role"], content=r["content"]) for r in reversed(rows)]
 
-    reply = _llm_reply(msg, history)
+    image_paths = _resolve_image_paths(req.attachment_ids or [])
+    reply, stages, model_used = _route_task(msg, history, image_paths)
 
     now_iso = datetime.utcnow().isoformat()
     with db() as c:
@@ -474,8 +670,10 @@ def chat(req: ChatRequest):
     return ChatResponse(
         reply=reply,
         timestamp=datetime.now().strftime("%H:%M"),
-        model="stub-dev",
+        model=model_used,
         session_id=sid,
+        stages=stages,
+        model_used=model_used,
     )
 
 

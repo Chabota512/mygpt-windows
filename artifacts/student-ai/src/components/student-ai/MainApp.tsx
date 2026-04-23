@@ -40,7 +40,7 @@ function getInitials(name: string): string {
 
 /* ─────────────── Types ─────────────── */
 type Message = { id: number; role: "user" | "assistant"; content: string; timestamp: string };
-type Attachment = { name: string; kind: "image" | "pdf" | "doc" };
+type Attachment = { name: string; kind: "image" | "pdf" | "doc"; id?: string };
 
 const CALC_SCHOOLS = [
   { id: "engineering", label: "Engineering", short: "Sci", icon: FlaskConical, color: "text-indigo-500", rows: [["sin","cos","tan","π"],["log","ln","√","x²"],["(",")","%","÷"],["7","8","9","×"],["4","5","6","−"],["1","2","3","+"],["±","0",".","="]] },
@@ -472,13 +472,18 @@ export function MainApp() {
       setRightOpen(false);
     }
 
+    const imageIds = attachments
+      .filter(a => a.kind === "image" && !!a.id)
+      .map(a => a.id as string);
+
     try {
-      const data = await api.chat(trimmed, currentSessionId);
+      const data = await api.chat(trimmed, currentSessionId, imageIds);
       setBackendOnline(true);
       setMessages(prev => [
         ...prev,
         { id: Date.now() + 1, role: "assistant", content: data.reply, timestamp: data.timestamp ?? nowStamp() },
       ]);
+      setAttachments([]); // clear after a successful send so they're not reused
       if (!currentSessionId) setCurrentSessionId(data.session_id);
       refreshSessions();
     } catch (err) {
@@ -551,6 +556,12 @@ export function MainApp() {
       const item = await api.uploadFile(file);
       setBackendOnline(true);
       await refreshMemory();
+      // Stage as an attachment for the next chat send so the router can
+      // hand images to the vision specialist automatically.
+      setAttachments(prev => [
+        ...prev,
+        { name: item.filename, kind: item.kind, id: item.id },
+      ]);
       setMessages(prev => [
         ...prev,
         {
