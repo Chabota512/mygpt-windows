@@ -84,11 +84,11 @@ async fn start_backend(app: &AppHandle) -> Result<CommandChild, String> {
 pub fn stop_all(handles: BackendHandles) {
     if let Some(child) = handles.backend {
         let _ = child.kill();
-        eprintln!("[mygpt] killed backend");
+        eprintln!("[mygpt] terminated backend (mygpt-backend)");
     }
     if let Some(child) = handles.ollama {
         let _ = child.kill();
-        eprintln!("[mygpt] killed ollama");
+        eprintln!("[mygpt] terminated ollama service");
     }
 }
 
