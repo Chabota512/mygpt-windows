@@ -12,7 +12,7 @@ import {
 import {
   GraduationCap, Send, FileText, Image, BookOpen, Settings,
   ChevronRight, Paperclip, MoreHorizontal, WifiOff, Download,
-  MessageSquare, X, Plus, Mic, Layers,
+  MessageSquare, X, Plus, Mic, AudioLines, Layers,
   PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen,
   PenLine, Calculator, ChevronUp, Search,
   ExternalLink, CheckCircle2, Circle, Loader2,
@@ -1419,12 +1419,13 @@ export function MainApp() {
                 }}
                 placeholder={activeTool === "Write Doc" ? "Describe the document you want written..." : activeTool === "Calculator" ? "Type a calculation or use the floating calculator..." : activeTool === "Search Notes" ? "Type to search your notes and files..." : "Ask anything, attach images or PDFs..."}
                 className={`flex-1 bg-transparent text-sm resize-none outline-none leading-relaxed px-4 pt-3 pb-1 ${c.textMd} placeholder:${c.textGhost}`} />
-              <div className="flex items-center gap-1 px-3 pb-2">
+              <div className="flex items-center gap-0.5 px-3 pb-2">
                 <button
                   onClick={() => fileInputRef.current?.click()}
-                  title="Upload PDF / image to local memory"
-                  className={`w-7 h-7 flex items-center justify-center rounded-lg ${c.textGhost} ${c.hoverMuted} transition-colors`}>
-                  <Paperclip className="w-3.5 h-3.5" />
+                  title="Attach PDF or image"
+                  aria-label="Attach a PDF or image"
+                  className={`w-5 h-5 flex items-center justify-center rounded-md ${c.textGhost} ${c.hoverMuted} transition-colors`}>
+                  <Plus className="w-3 h-3" strokeWidth={1.5} />
                 </button>
                 <input
                   ref={fileInputRef}
@@ -1436,9 +1437,19 @@ export function MainApp() {
                     if (f) uploadPdfToBackend(f);
                     if (e.target) e.target.value = "";
                   }} />
-                {[Image, Mic].map((Icon, i) => (
-                  <button key={i} className={`w-7 h-7 flex items-center justify-center rounded-lg ${c.textGhost} ${c.hoverMuted} transition-colors`}><Icon className="w-3.5 h-3.5" /></button>
-                ))}
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  title="Take or upload a photo"
+                  aria-label="Take or upload a photo"
+                  className={`w-5 h-5 flex items-center justify-center rounded-md ${c.textGhost} ${c.hoverMuted} transition-colors`}>
+                  <Camera className="w-3 h-3" strokeWidth={1.5} />
+                </button>
+                <button
+                  title="Voice input (coming soon)"
+                  aria-label="Voice input"
+                  className={`w-5 h-5 flex items-center justify-center rounded-md ${c.textGhost} ${c.hoverMuted} transition-colors`}>
+                  <AudioLines className="w-3 h-3" strokeWidth={1.5} />
+                </button>
               </div>
             </div>
             <button
