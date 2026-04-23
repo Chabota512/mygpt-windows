@@ -634,6 +634,11 @@ export function MainApp() {
   const [storageLoading, setStorageLoading] = useState(false);
   const [modelStorage, setModelStorage] = useState<ApiModelStorageInfo | null>(null);
   const [modelStorageLoading, setModelStorageLoading] = useState(false);
+  const [customModelPath, setCustomModelPath] = useState<string>(() => {
+    try { return localStorage.getItem("custom-model-path") || ""; }
+    catch { return ""; }
+  });
+  const [customModelPathInput, setCustomModelPathInput] = useState(customModelPath);
   const refreshStorage = useCallback(async () => {
     setStorageLoading(true);
     try { setStorage(await api.getStorage()); }
@@ -646,6 +651,19 @@ export function MainApp() {
     catch { setModelStorage(null); }
     finally { setModelStorageLoading(false); }
   }, []);
+
+  const handleSaveCustomModelPath = useCallback(async () => {
+    try {
+      localStorage.setItem("custom-model-path", customModelPathInput);
+      setCustomModelPath(customModelPathInput);
+      if (customModelPathInput.trim()) {
+        await api.setCustomModelPath(customModelPathInput.trim());
+      }
+      await refreshModelStorage();
+    } catch (e) {
+      console.error("Failed to save custom model path:", e);
+    }
+  }, [customModelPathInput]);
 
   /* LLM Configuration */
   const [llmConfig, setLlmConfig] = useState<ApiLLMConfig | null>(null);
@@ -1973,6 +1991,38 @@ export function MainApp() {
                     </div>
                   </div>
                 )}
+              </section>
+
+              {/* Custom model path */}
+              <section>
+                <h3 className={`text-[11px] uppercase tracking-widest font-semibold mb-3 ${c.textFaint}`}>Custom model location</h3>
+                <div className={`rounded-xl border ${c.border} ${c.bgMuted} p-3.5 space-y-3`}>
+                  <div>
+                    <label className={`text-xs font-medium ${c.text} block mb-2`}>Model folder path</label>
+                    <input
+                      type="text"
+                      placeholder="e.g., C:\Models or /Volumes/ExternalDrive/models"
+                      value={customModelPathInput}
+                      onChange={(e) => setCustomModelPathInput(e.target.value)}
+                      className={`w-full px-3 py-2 rounded-lg border ${c.border} ${c.card} text-xs font-mono ${c.text} placeholder:${c.textFaint} focus:outline-none focus:ring-1 focus:ring-indigo-500`}
+                    />
+                    <p className={`text-[11px] mt-2 ${c.textFaint}`}>
+                      Point to the folder containing your model files. Leave empty to use the default location.
+                    </p>
+                  </div>
+                  <button
+                    onClick={handleSaveCustomModelPath}
+                    className={`w-full px-3 py-2 rounded-lg text-[11px] font-medium border ${c.border} bg-indigo-600 text-white hover:bg-indigo-700 transition-colors`}
+                  >
+                    Apply Custom Path
+                  </button>
+                  {customModelPath && customModelPath !== customModelPathInput && (
+                    <p className={`text-[11px] ${c.textFaint} italic`}>Changes pending. Click "Apply Custom Path" to save.</p>
+                  )}
+                  {customModelPath && customModelPath === customModelPathInput && customModelPath !== "" && (
+                    <p className={`text-[11px] text-emerald-600`}>✓ Custom path applied: {customModelPath}</p>
+                  )}
+                </div>
               </section>
 
               {/* Storage location */}

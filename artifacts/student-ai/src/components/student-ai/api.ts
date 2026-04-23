@@ -130,6 +130,12 @@ export const api = {
   // ── Storage ───────────────────────────────────────────────
   getStorage: () => fetch(`${API_BASE}/storage`).then(j<ApiStorageInfo>),
   getModelStorage: () => fetch(`${API_BASE}/model-storage`).then(j<ApiModelStorageInfo>),
+  setCustomModelPath: (path: string) =>
+    fetch(`${API_BASE}/model-storage/custom-path`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ path }),
+    }).then(j<ApiModelStorageInfo>),
 
   // ── LLM Configuration ──────────────────────────────────────
   getLLMConfig: () => fetch(`${API_BASE}/llm-config`).then(j<ApiLLMConfig>),
