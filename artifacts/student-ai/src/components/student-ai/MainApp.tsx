@@ -743,6 +743,30 @@ export function MainApp() {
     }
   }, [llmConfig, refreshLLMStatus]);
 
+  const handleRestartOllama = useCallback(async () => {
+    setLlmTesting(true);
+    setLlmTestMsg("🔄 Restarting Ollama...");
+    try {
+      // Check if Tauri is available
+      const tauri = (window as any).__TAURI__;
+      if (tauri) {
+        const result = await tauri.invoke("restart_ollama_command");
+        setLlmTestMsg(`✓ ${result}`);
+        // Wait a moment and refresh status
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        await refreshLLMStatus();
+      } else {
+        // Fallback: just test connection
+        setLlmTestMsg("⚠️ Restart not available in this context, running connection test instead...");
+        await handleTestLLM();
+      }
+    } catch (e) {
+      setLlmTestMsg(`Error: ${e instanceof Error ? e.message : "Failed to restart Ollama"}`);
+    } finally {
+      setLlmTesting(false);
+    }
+  }, [refreshLLMStatus, handleTestLLM]);
+
   useEffect(() => { 
     if (settingsOpen) { 
       refreshStorage(); 
@@ -2271,6 +2295,37 @@ export function MainApp() {
 
                 {/* Configuration Inputs */}
                 <div className={`space-y-3 rounded-xl border ${c.border} ${c.bgMuted} p-3.5`}>
+                  {/* Ollama Status Section */}
+                  <div className={`rounded-lg border ${llmStatus?.online ? "border-emerald-500/30 bg-emerald-500/5" : "border-amber-500/30 bg-amber-500/5"} p-3`}>
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <div className={`w-2.5 h-2.5 rounded-full ${llmStatus?.online ? "bg-emerald-500 animate-pulse" : "bg-amber-500"}`}></div>
+                        <div>
+                          <p className={`text-[11px] font-medium ${llmStatus?.online ? "text-emerald-600" : "text-amber-600"}`}>
+                            Ollama Status: {llmStatus?.online ? "✓ Online" : "⚠️ Offline"}
+                          </p>
+                          {llmStatus?.available_models && llmStatus.available_models.length > 0 && (
+                            <p className={`text-[10px] ${llmStatus?.online ? "text-emerald-500" : "text-amber-500"} mt-0.5`}>
+                              {llmStatus.available_models.length} model(s) available
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      <button
+                        onClick={handleRestartOllama}
+                        disabled={llmTesting}
+                        className={`px-2.5 py-1.5 rounded-lg text-[10px] font-medium border border-indigo-600 bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 transition-all flex items-center gap-1.5`}
+                        title="Restart Ollama service"
+                      >
+                        {llmTesting ? (
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                        ) : (
+                          <span>🔄 Restart</span>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+
                   <div>
                     <label className={`block text-[11px] font-medium ${c.text} mb-1.5`}>Ollama Host URL (optional)</label>
                     <input
@@ -2285,45 +2340,72 @@ export function MainApp() {
                     </p>
                   </div>
 
+                  {/* Available Models Display */}
+                  {llmStatus?.available_models && llmStatus.available_models.length > 0 && (
+                    <div className={`rounded-lg border ${c.border} ${c.bgSub} p-3 space-y-2`}>
+                      <p className={`text-[11px] font-medium ${c.textBody}`}>📁 Available Models:</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {llmStatus.available_models.map((model) => (
+                          <button
+                            key={model}
+                            onClick={() => {
+                              if (llmConfig) {
+                                // Cycle through roles: vision → reasoning → writer
+                                const current = 
+                                  llmConfig.vision_model === model ? llmConfig.reasoning_model === model ? "writer" : "reasoning"
+                                  : llmConfig.reasoning_model === model ? "writer"
+                                  : llmConfig.writer_model === model ? "vision"
+                                  : "vision";
+                                const updated = { ...llmConfig };
+                                updated[`${current}_model` as keyof typeof updated] = model;
+                                setLlmConfig(updated);
+                              }
+                            }}
+                            className={`px-2.5 py-1.5 rounded-md text-[10px] font-medium border transition-all ${
+                              llmConfig?.vision_model === model || llmConfig?.reasoning_model === model || llmConfig?.writer_model === model
+                                ? "bg-indigo-600 text-white border-indigo-600"
+                                : `border ${c.border} ${c.textBody} ${c.hoverMuted}`
+                            }`}
+                            title={`Click to assign. Currently: ${
+                              llmConfig?.vision_model === model ? "Vision, " : ""
+                            }${llmConfig?.reasoning_model === model ? "Reasoning, " : ""}${
+                              llmConfig?.writer_model === model ? "Writer" : ""
+                            }`.replace(/, $/, "") || "Click to assign to a role"}
+                          >
+                            {model}
+                          </button>
+                        ))}
+                      </div>
+                      <p className={`text-[10px] ${c.textFaint}`}>
+                        💡 Click any model to cycle through roles: Vision → Reasoning → Writer
+                      </p>
+                    </div>
+                  )}
+
                   {/* Model Selection */}
                 {llmStatus?.available_models && llmStatus.available_models.length > 0 && (
                   <div className={`rounded-lg border ${c.border} ${c.bgSub} p-3 space-y-2 mb-3`}>
-                    <p className={`text-[11px] font-medium ${c.textBody}`}>📁 Available models from your folder & Ollama:</p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {llmStatus.available_models.map((model) => (
-                        <button
-                          key={model}
-                          onClick={() => {
-                            if (llmConfig) {
-                              // Cycle through roles: vision → reasoning → writer
-                              const current = 
-                                llmConfig.vision_model === model ? llmConfig.reasoning_model === model ? "writer" : "reasoning"
-                                : llmConfig.reasoning_model === model ? "writer"
-                                : llmConfig.writer_model === model ? "vision"
-                                : "vision";
-                              const updated = { ...llmConfig };
-                              updated[`${current}_model` as keyof typeof updated] = model;
-                              setLlmConfig(updated);
-                            }
-                          }}
-                          className={`px-2.5 py-1.5 rounded-md text-[10px] font-medium border transition-all ${
-                            llmConfig?.vision_model === model || llmConfig?.reasoning_model === model || llmConfig?.writer_model === model
-                              ? "bg-indigo-600 text-white border-indigo-600"
-                              : `border ${c.border} ${c.textBody} ${c.hoverMuted}`
-                          }`}
-                          title={`Click to assign. Currently: ${
-                            llmConfig?.vision_model === model ? "Vision, " : ""
-                          }${llmConfig?.reasoning_model === model ? "Reasoning, " : ""}${
-                            llmConfig?.writer_model === model ? "Writer" : ""
-                          }`.replace(/, $/, "") || "Click to assign to a role"}
-                        >
-                          {model}
-                        </button>
-                      ))}
+                    <p className={`text-[11px] font-medium ${c.textBody}`}>🎯 Current Model Assignments:</p>
+                    <div className="space-y-1.5">
+                      <div className={`text-[10px] ${c.textMuted} flex items-center gap-2`}>
+                        <span className="w-16">Vision:</span>
+                        <span className={`px-2 py-1 rounded-md ${llmConfig?.vision_model ? `border border-indigo-500/30 bg-indigo-500/5 text-indigo-600 font-medium` : `${c.textFaint}`}`}>
+                          {llmConfig?.vision_model || "Not assigned"}
+                        </span>
+                      </div>
+                      <div className={`text-[10px] ${c.textMuted} flex items-center gap-2`}>
+                        <span className="w-16">Reasoning:</span>
+                        <span className={`px-2 py-1 rounded-md ${llmConfig?.reasoning_model ? `border border-indigo-500/30 bg-indigo-500/5 text-indigo-600 font-medium` : `${c.textFaint}`}`}>
+                          {llmConfig?.reasoning_model || "Not assigned"}
+                        </span>
+                      </div>
+                      <div className={`text-[10px] ${c.textMuted} flex items-center gap-2`}>
+                        <span className="w-16">Writer:</span>
+                        <span className={`px-2 py-1 rounded-md ${llmConfig?.writer_model ? `border border-indigo-500/30 bg-indigo-500/5 text-indigo-600 font-medium` : `${c.textFaint}`}`}>
+                          {llmConfig?.writer_model || "Not assigned"}
+                        </span>
+                      </div>
                     </div>
-                    <p className={`text-[10px] ${c.textFaint}`}>
-                      💡 Click any model to cycle through roles: Vision → Reasoning → Writer
-                    </p>
                   </div>
                 )}
 
@@ -2392,8 +2474,8 @@ export function MainApp() {
 
                   {/* Test Result Message */}
                   {llmTestMsg && (
-                    <div className={`rounded-lg border ${llmTestMsg.includes("✓") || llmTestMsg.includes("Found") ? "border-emerald-500/30 bg-emerald-500/5" : "border-amber-500/30 bg-amber-500/5"} p-2.5`}>
-                      <p className={`text-[10px] ${llmTestMsg.includes("✓") || llmTestMsg.includes("Found") ? "text-emerald-600" : "text-amber-600"}`}>
+                    <div className={`rounded-lg border ${llmTestMsg.includes("✓") || llmTestMsg.includes("Found") || llmTestMsg.includes("Restarted") ? "border-emerald-500/30 bg-emerald-500/5" : "border-amber-500/30 bg-amber-500/5"} p-2.5`}>
+                      <p className={`text-[10px] ${llmTestMsg.includes("✓") || llmTestMsg.includes("Found") || llmTestMsg.includes("Restarted") ? "text-emerald-600" : "text-amber-600"}`}>
                         {llmTestMsg}
                       </p>
                     </div>

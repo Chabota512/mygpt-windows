@@ -10,12 +10,22 @@ pub struct AppState {
     pub backend: Mutex<Option<backend::BackendHandles>>,
 }
 
+#[tauri::command]
+async fn restart_ollama_command(state: tauri::State<'_, AppState>, app: tauri::AppHandle) -> Result<String, String> {
+    let mut state_guard = state.backend.lock().unwrap();
+    match &mut *state_guard {
+        Some(handles) => backend::restart_ollama(handles, &app).await,
+        None => Err("Backend not initialized".to_string()),
+    }
+}
+
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .manage(AppState {
             backend: Mutex::new(None),
         })
+        .invoke_handler(tauri::generate_handler![restart_ollama_command])
         .setup(|app| {
             let handle = app.handle().clone();
             // Spawn Ollama (if installed) and the bundled Python backend.

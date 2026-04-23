@@ -51,6 +51,34 @@ pub async fn start_all(app: &AppHandle) -> Result<BackendHandles, String> {
     Ok(BackendHandles { backend: Some(backend), ollama })
 }
 
+pub async fn restart_ollama(handles: &mut BackendHandles, app: &AppHandle) -> Result<String, String> {
+    // Kill existing Ollama process if running
+    if let Some(child) = handles.ollama.take() {
+        let _ = child.kill();
+        eprintln!("[mygpt] terminated ollama service for restart");
+        // Give it a moment to fully shutdown
+        tokio::time::sleep(Duration::from_secs(2)).await;
+    }
+    
+    // Start a new Ollama process
+    match start_ollama(app).await {
+        Some(_child) => {
+            handles.ollama = Some(_child);
+            eprintln!("[mygpt] ollama restarted successfully");
+            Ok("Ollama restarted successfully".to_string())
+        }
+        None => {
+            // Check if it's already running externally
+            if is_port_open(OLLAMA_PORT).await {
+                eprintln!("[mygpt] ollama already running on port {}", OLLAMA_PORT);
+                Ok("Ollama is already running".to_string())
+            } else {
+                Err("Failed to restart Ollama - is it installed?".to_string())
+            }
+        }
+    }
+}
+
 async fn start_ollama(app: &AppHandle) -> Option<CommandChild> {
     if is_port_open(OLLAMA_PORT).await {
         eprintln!("[mygpt] ollama already running on :{}", OLLAMA_PORT);
