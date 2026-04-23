@@ -501,7 +501,7 @@ export function MainApp() {
         {
           id: Date.now() + 1, role: "assistant",
           content:
-            "The local AI service isn't running. Please make sure it's started and try again.",
+            "Something went wrong on my end. Please try again in a moment.",
           timestamp: nowStamp(),
         },
       ]);
