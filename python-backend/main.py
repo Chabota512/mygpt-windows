@@ -360,6 +360,11 @@ OLLAMA_VISION_MODEL   = os.environ.get("OLLAMA_VISION_MODEL",   "qwen2.5vl:3b")
 OLLAMA_REASONING_MODEL = os.environ.get("OLLAMA_REASONING_MODEL", "phi4-mini")
 OLLAMA_WRITER_MODEL   = os.environ.get("OLLAMA_WRITER_MODEL",   "llama3.2:1b")
 OLLAMA_NUM_CTX        = int(os.environ.get("OLLAMA_NUM_CTX", "4096"))
+# How many critique → revise cycles the reasoning specialist runs on its
+# own draft before handing it to the writer. 0 disables debate (single shot).
+# 1 is the sweet spot for an 8 GB laptop (one extra critique + one revision,
+# all done while the reasoning model is still in RAM — no extra swap cost).
+OLLAMA_DEBATE_ROUNDS  = max(0, int(os.environ.get("OLLAMA_DEBATE_ROUNDS", "1")))
 
 _REASONING_HINTS = re.compile(
     r"(?ix)"
@@ -405,6 +410,95 @@ def _ollama_chat(
         stream=False,
     )
     return (out.get("message") or {}).get("content", "").strip()
+
+
+def _run_reasoning_debate(
+    base_history: list[dict],
+    user_block: str,
+    rounds: int,
+    stages: list[str],
+) -> str:
+    """
+    Have the reasoning specialist talk to itself: draft → critique → revise.
+
+    Why same model for all calls?
+      - We're locked to OLLAMA_MAX_LOADED_MODELS=1 on an 8 GB box.
+      - Keeping the SAME model for every debate turn means it's only loaded
+        ONCE. No swap cost between rounds.
+      - The model plays different roles via different system prompts —
+        a clean, well-known agent-debate pattern.
+
+    Returns the final, revised reasoning answer.
+    """
+    sys_solver = (
+        "You are a careful STEM reasoning assistant for a Mechatronics "
+        "student. Show working step-by-step. Keep units. Prefer correctness "
+        "over brevity."
+    )
+    sys_critic = (
+        "You are a strict reviewer. Read the draft answer below and find "
+        "concrete problems: math errors, wrong units, missing steps, wrong "
+        "assumptions, unclear bits, or anything that could mislead a "
+        "student. List ONLY the issues, numbered, one per line. If the "
+        "draft is genuinely correct and complete, reply with the single "
+        "word: NONE."
+    )
+    sys_reviser = (
+        "You are the same reasoning assistant. Rewrite your previous answer "
+        "to fix EVERY issue listed by the reviewer. Keep what was correct. "
+        "Do not apologise or mention the review — just produce the better "
+        "answer."
+    )
+
+    # ── Round 0 · initial draft ────────────────────────────────
+    draft = _ollama_chat(
+        OLLAMA_REASONING_MODEL,
+        base_history + [
+            {"role": "system", "content": sys_solver},
+            {"role": "user", "content": user_block},
+        ],
+    )
+
+    # ── Rounds 1..N · critique + revise ────────────────────────
+    for i in range(1, rounds + 1):
+        stages.append(f"Critiquing draft (round {i})…")
+        critique = _ollama_chat(
+            OLLAMA_REASONING_MODEL,
+            [
+                {"role": "system", "content": sys_critic},
+                {
+                    "role": "user",
+                    "content": (
+                        f"Original question:\n{user_block}\n\n"
+                        f"Draft answer:\n{draft}"
+                    ),
+                },
+            ],
+        )
+
+        # Critic says the draft is fine — stop early, don't waste a swap.
+        if critique.strip().upper().startswith("NONE"):
+            stages.append("Reviewer approved the draft — stopping debate.")
+            break
+
+        stages.append(f"Revising answer (round {i})…")
+        draft = _ollama_chat(
+            OLLAMA_REASONING_MODEL,
+            base_history + [
+                {"role": "system", "content": sys_reviser},
+                {"role": "user", "content": user_block},
+                {"role": "assistant", "content": draft},
+                {
+                    "role": "user",
+                    "content": (
+                        "Reviewer found these issues — fix them all:\n"
+                        f"{critique}"
+                    ),
+                },
+            ],
+        )
+
+    return draft
 
 
 def _resolve_image_paths(attachment_ids: list[str]) -> list[str]:
@@ -472,48 +566,43 @@ def _route_task(
                 images=image_paths,
             )
 
-        # ── Step 2 · Pick the next specialist ──────────────────────
+        # ── Step 2 · Reasoning, with optional self-debate ──────────
         use_reasoning = _is_reasoning_task(message) or bool(vision_desc)
         reasoning_out = ""
         if use_reasoning:
-            stages.append(f"Reasoning with {OLLAMA_REASONING_MODEL}…")
+            stages.append(f"Drafting answer with {OLLAMA_REASONING_MODEL}…")
             user_block = message
             if vision_desc:
                 user_block = (
                     f"Image description (from vision specialist):\n{vision_desc}\n\n"
                     f"User question:\n{message}"
                 )
-            reasoning_out = _ollama_chat(
-                OLLAMA_REASONING_MODEL,
-                base_history + [
-                    {
-                        "role": "system",
-                        "content": (
-                            "You are a careful STEM reasoning assistant for a "
-                            "Mechatronics student. Show working step-by-step. "
-                            "Keep units. Prefer correctness over brevity."
-                        ),
-                    },
-                    {"role": "user", "content": user_block},
-                ],
+            reasoning_out = _run_reasoning_debate(
+                base_history, user_block, OLLAMA_DEBATE_ROUNDS, stages,
             )
 
         # ── Step 3 · Writer / formatter ─────────────────────────────
-        # If we already have a reasoning answer, polish it.
-        # Otherwise this is a plain writing/chat turn — answer directly.
+        # If we already have a reasoning answer, polish it. The writer also
+        # acts as a final "clarity reviewer" — it can flag confusion by
+        # prefixing its reply with `[NEEDS_REWORK]`, which sends us back to
+        # the reasoning specialist for one more pass. This is the cross-model
+        # conversation: writer ↔ reasoning, capped at 1 bounce so we don't
+        # thrash the RAM.
         stages.append(f"Formatting with {OLLAMA_WRITER_MODEL}…")
         if reasoning_out:
+            writer_system = (
+                "You are an academic writing assistant. Take the draft below "
+                "and rewrite it as a clean, well-structured answer for a "
+                "student. Preserve every number, equation and step. Use short "
+                "paragraphs, headings or bullets where helpful. Do NOT add "
+                "new facts.\n\n"
+                "If — and ONLY if — the draft is so unclear or contradictory "
+                "that you cannot polish it without inventing content, reply "
+                "with EXACTLY this format and nothing else:\n"
+                "[NEEDS_REWORK]\n<one short sentence saying what is unclear>"
+            )
             writer_msgs = base_history + [
-                {
-                    "role": "system",
-                    "content": (
-                        "You are an academic writing assistant. Take the draft "
-                        "below and rewrite it as a clean, well-structured "
-                        "answer for a student. Preserve every number, equation "
-                        "and step. Use short paragraphs, headings or bullets "
-                        "where helpful. Do NOT add new facts."
-                    ),
-                },
+                {"role": "system", "content": writer_system},
                 {"role": "user", "content": f"Draft to polish:\n\n{reasoning_out}"},
             ]
         else:
@@ -529,6 +618,51 @@ def _route_task(
             ]
 
         final = _ollama_chat(OLLAMA_WRITER_MODEL, writer_msgs)
+
+        # ── Step 4 · Optional bounce-back if writer asked for clarity ──
+        if (
+            reasoning_out
+            and final.lstrip().startswith("[NEEDS_REWORK]")
+        ):
+            feedback = final.split("\n", 1)[1].strip() if "\n" in final else "Make it clearer and more complete."
+            stages.append("Writer asked for clarity — sending back to reasoning…")
+            reasoning_out = _ollama_chat(
+                OLLAMA_REASONING_MODEL,
+                base_history + [
+                    {
+                        "role": "system",
+                        "content": (
+                            "You are the reasoning assistant. Your previous "
+                            "answer was unclear to the writing assistant. "
+                            "Rewrite it more clearly while preserving every "
+                            "correct step, number and unit."
+                        ),
+                    },
+                    {"role": "user", "content": message},
+                    {"role": "assistant", "content": reasoning_out},
+                    {
+                        "role": "user",
+                        "content": f"Writer's feedback: {feedback}\n\nPlease rewrite.",
+                    },
+                ],
+            )
+            stages.append(f"Re-formatting with {OLLAMA_WRITER_MODEL}…")
+            final = _ollama_chat(
+                OLLAMA_WRITER_MODEL,
+                base_history + [
+                    {
+                        "role": "system",
+                        "content": (
+                            "You are an academic writing assistant. Polish "
+                            "this revised draft into a clean answer for a "
+                            "student. Preserve every number, equation and "
+                            "step. Do not add new facts."
+                        ),
+                    },
+                    {"role": "user", "content": f"Draft to polish:\n\n{reasoning_out}"},
+                ],
+            )
+
         if not final:
             # Writer produced nothing — fall back to the upstream output
             final = reasoning_out or vision_desc or "(no response)"
