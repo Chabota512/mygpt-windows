@@ -346,6 +346,7 @@ export function MainApp() {
   const [isThinking, setIsThinking] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const chatScrollRef = useRef<HTMLDivElement | null>(null);
+  const consecutiveFailuresRef = useRef(0);
 
 
   /* ─── Backend wiring (local Python FastAPI on http://localhost:8000) ─── */
@@ -487,6 +488,7 @@ export function MainApp() {
     try {
       const data = await api.chat(trimmed, currentSessionId, imageIds);
       setBackendOnline(true);
+      consecutiveFailuresRef.current = 0;
       setMessages(prev => [
         ...prev,
         { id: Date.now() + 1, role: "assistant", content: data.reply, timestamp: data.timestamp ?? nowStamp() },
@@ -496,12 +498,19 @@ export function MainApp() {
       refreshSessions();
     } catch (err) {
       reportError(err);
+      consecutiveFailuresRef.current += 1;
+      const fails = consecutiveFailuresRef.current;
+      const message =
+        fails === 1
+          ? "Something went wrong on my end. Please try again in a moment."
+          : fails === 2
+          ? "Still having trouble responding. Give it one more try in a few seconds."
+          : "I'm not able to respond right now. The app is trying to recover in the background — please try again shortly.";
       setMessages(prev => [
         ...prev,
         {
           id: Date.now() + 1, role: "assistant",
-          content:
-            "Something went wrong on my end. Please try again in a moment.",
+          content: message,
           timestamp: nowStamp(),
         },
       ]);
