@@ -382,16 +382,18 @@ export function MainApp() {
     const msg = err instanceof Error ? err.message : String(err);
     setBackendError(msg);
     setBackendOnline(false);
+    addLog(`Backend error: ${msg}`, "error");
   };
 
   // Update header time every minute (GMT +2)
   useEffect(() => {
     setHeaderTime(getGMT2DateTime());
+    addLog("App initialized - My_GPT 4 Students", "info");
     const interval = setInterval(() => {
       setHeaderTime(getGMT2DateTime());
     }, 60000); // Update every 60 seconds
     return () => clearInterval(interval);
-  }, []);
+  }, [addLog]);
 
   /* ── Load sessions / memory / documents on mount ── */
   const refreshSessions = useCallback(async () => {
@@ -427,14 +429,23 @@ export function MainApp() {
     const loadAppData = async () => {
       attempt++;
       try {
+        addLog(`Loading app data (attempt ${attempt}/${maxAttempts})`, "info");
         const list = await refreshSessions();
+        addLog(`✓ Sessions loaded: ${list.length} session(s)`, "info");
+        
         await refreshMemory();
+        addLog(`✓ Memory loaded`, "info");
+        
         await refreshDocuments();
+        addLog(`✓ Documents loaded`, "info");
+        
         try {
           const p = await api.getProfile();
           const isDefault = (!p.name || p.name === DEFAULT_PROFILE.name) && !p.career && !p.avatar;
           if (!isDefault) setProfile({ name: p.name, career: p.career, avatar: p.avatar });
-        } catch { /* offline — keep localStorage profile */ }
+          addLog(`✓ Profile loaded`, "info");
+        } catch { addLog(`Profile offline — using localStorage`, "warn"); }
+        
         if (list.length > 0) {
           const first = list[0];
           setCurrentSessionId(first.id);
@@ -446,6 +457,7 @@ export function MainApp() {
                 id: i + 1, role: m.role, content: m.content, timestamp: nowStamp(),
               })));
               setIsEmptyChat(false);
+              addLog(`✓ Loaded ${msgs.length} message(s) from first session`, "info");
             } else {
               setIsEmptyChat(true);
             }
@@ -455,11 +467,15 @@ export function MainApp() {
         // Backend not ready yet — retry with exponential backoff
         if (attempt < maxAttempts) {
           const delay = Math.min(1000 * Math.pow(1.5, attempt - 1), 5000); // Cap at 5s
+          addLog(`Backend not ready, retrying in ${delay}ms...`, "warn");
           retryTimeout = window.setTimeout(loadAppData, delay);
+        } else {
+          addLog(`Failed to load app data after ${maxAttempts} attempts`, "error");
         }
       }
     };
     
+    addLog(`Starting app initialization...`, "info");
     loadAppData();
     
     return () => {
@@ -494,6 +510,8 @@ export function MainApp() {
     const trimmed = text.trim();
     if (!trimmed) return;
 
+    addLog(`Sending message: "${trimmed.substring(0, 50)}${trimmed.length > 50 ? "..." : ""}"`, "info");
+
     if (activeTool === "Write Doc") {
       await generateDoc(trimmed);
       return;
@@ -520,6 +538,7 @@ export function MainApp() {
     try {
       const data = await api.chat(trimmed, currentSessionId, imageIds);
       setBackendOnline(true);
+      addLog(`✓ Received response (${data.reply.length} chars)`, "info");
       consecutiveFailuresRef.current = 0;
       setMessages(prev => [
         ...prev,
@@ -599,9 +618,11 @@ export function MainApp() {
   /* ── Memory uploads ── */
   async function uploadPdfToBackend(file: File) {
     setBackendError(null);
+    addLog(`Uploading file: ${file.name} (${Math.round(file.size / 1024)} KB)`, "info");
     try {
       const item = await api.uploadFile(file);
       setBackendOnline(true);
+      addLog(`✓ File uploaded: ${item.filename}`, "info");
       await refreshMemory();
       // Stage as an attachment for the next chat send so the router can
       // hand images to the vision specialist automatically.
@@ -660,6 +681,23 @@ export function MainApp() {
   /* Settings & shortcuts help */
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [contactOpen, setContactOpen] = useState(false);
+  
+  /* Logging system for debugging */
+  const [logs, setLogs] = useState<Array<{ timestamp: string; level: "info" | "warn" | "error"; message: string }>>([]);
+  const MAX_LOGS = 200; // Keep only last 200 logs
+  
+  const addLog = useCallback((message: string, level: "info" | "warn" | "error" = "info") => {
+    const timestamp = new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    setLogs(prev => {
+      const updated = [...prev, { timestamp, level, message }];
+      // Keep only last MAX_LOGS entries
+      return updated.slice(Math.max(0, updated.length - MAX_LOGS));
+    });
+    if (level === "error") console.error(`[${timestamp}]`, message);
+    else if (level === "warn") console.warn(`[${timestamp}]`, message);
+    else console.log(`[${timestamp}]`, message);
+  }, []);
+  
   const [storage, setStorage] = useState<ApiStorageInfo | null>(null);
   const [storageLoading, setStorageLoading] = useState(false);
   const [modelStorage, setModelStorage] = useState<ApiModelStorageInfo | null>(null);
@@ -746,35 +784,41 @@ export function MainApp() {
   const handleRestartOllama = useCallback(async () => {
     setLlmTesting(true);
     setLlmTestMsg("🔄 Restarting Ollama...");
+    addLog("User manually triggered Ollama restart", "warn");
     try {
       // Check if Tauri is available
       const tauri = (window as any).__TAURI__;
       if (tauri) {
         const result = await tauri.invoke("restart_ollama_command");
         setLlmTestMsg(`✓ ${result}`);
+        addLog(`Ollama restart initiated: ${result}`, "info");
         // Wait for restart to complete (2 sec sleep + 1 sec buffer)
         await new Promise(resolve => setTimeout(resolve, 3500));
         await refreshLLMStatus();
       } else {
         // Fallback: just test connection
         setLlmTestMsg("⚠️ Restart not available in this context, running connection test instead...");
+        addLog("Tauri not available, running fallback test", "warn");
         await handleTestLLM();
       }
     } catch (e) {
-      setLlmTestMsg(`Error: ${e instanceof Error ? e.message : "Failed to restart Ollama"}`);
+      const msg = e instanceof Error ? e.message : "Failed to restart Ollama";
+      setLlmTestMsg(`Error: ${msg}`);
+      addLog(`Error restarting Ollama: ${msg}`, "error");
     } finally {
       setLlmTesting(false);
     }
-  }, [refreshLLMStatus, handleTestLLM]);
+  }, [refreshLLMStatus, handleTestLLM, addLog]);
 
   useEffect(() => { 
     if (settingsOpen) { 
+      addLog(`Settings panel opened`, "info");
       refreshStorage(); 
       refreshModelStorage(); 
       refreshLLMConfig();
       refreshLLMStatus();
     } 
-  }, [settingsOpen, refreshStorage, refreshModelStorage, refreshLLMConfig, refreshLLMStatus]);
+  }, [settingsOpen, refreshStorage, refreshModelStorage, refreshLLMConfig, refreshLLMStatus, addLog]);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
 
   /* Onboarding banner */
@@ -2519,6 +2563,62 @@ export function MainApp() {
                   </div>
                   <ChevronRight className={`w-4 h-4 ${c.textFaint}`} />
                 </button>
+              </section>
+
+              {/* Debug Logs */}
+              <section>
+                <h3 className={`text-[11px] uppercase tracking-widest font-semibold mb-3 ${c.textFaint}`}>Debug Logs</h3>
+                <div className={`rounded-xl border ${c.border} ${c.bgMuted} p-3 space-y-3`}>
+                  <div className={`rounded-lg ${c.bgSub} border ${c.border} p-2.5 font-mono text-[9px] overflow-hidden flex flex-col`} style={{ height: '180px' }}>
+                    <div className="overflow-y-auto flex-1 space-y-0.5">
+                      {logs.length === 0 ? (
+                        <p className={c.textFaint}>No logs yet — checking services...</p>
+                      ) : (
+                        logs.map((log, idx) => (
+                          <div
+                            key={idx}
+                            className={`whitespace-nowrap ${
+                              log.level === "error"
+                                ? "text-rose-400"
+                                : log.level === "warn"
+                                ? "text-amber-400"
+                                : "text-emerald-400"
+                            }`}
+                          >
+                            <span className={c.textFaint}>[{log.timestamp}]</span>{" "}
+                            <span>
+                              {log.level === "error" ? "❌" : log.level === "warn" ? "⚠️" : "ℹ️"} {log.message}
+                            </span>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => {
+                        addLog("Manual refresh triggered by user", "info");
+                        refreshSessions();
+                        refreshLLMStatus();
+                      }}
+                      className={`flex-1 px-3 py-1.5 rounded-lg text-[10px] font-medium border ${c.border} ${c.textBody} ${c.hoverMuted} transition-colors`}
+                    >
+                      Refresh Status
+                    </button>
+                    <button
+                      onClick={() => {
+                        setLogs([]);
+                        addLog("Logs cleared by user", "info");
+                      }}
+                      className={`flex-1 px-3 py-1.5 rounded-lg text-[10px] font-medium border ${c.border} ${c.textBody} ${c.hoverMuted} transition-colors`}
+                    >
+                      Clear Logs
+                    </button>
+                  </div>
+                  <p className={`text-[10px] ${c.textFaint}`}>
+                    These logs help diagnose connection issues. Share them when reporting problems.
+                  </p>
+                </div>
               </section>
             </div>
 

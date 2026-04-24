@@ -46,8 +46,17 @@ pub struct BackendHandles {
 }
 
 pub async fn start_all(app: &AppHandle) -> Result<BackendHandles, String> {
+    eprintln!("[mygpt] Starting Ollama service first...");
     let ollama = start_ollama(app).await;
+    
+    // Give Ollama extra time to fully initialize before starting backend
+    eprintln!("[mygpt] Waiting for Ollama to fully initialize...");
+    tokio::time::sleep(Duration::from_secs(3)).await;
+    
+    eprintln!("[mygpt] Starting Python backend...");
     let backend = start_backend(app).await?;
+    
+    eprintln!("[mygpt] ✓ All services started successfully");
     Ok(BackendHandles { backend: Some(backend), ollama })
 }
 
@@ -80,13 +89,16 @@ pub async fn restart_ollama(handles: &mut BackendHandles, app: &AppHandle) -> Re
 }
 
 pub async fn start_ollama(app: &AppHandle) -> Option<CommandChild> {
+    let models_dir = get_models_dir();
+    eprintln!("[mygpt] Checking if Ollama is already running on port {}...", OLLAMA_PORT);
+    
     if is_port_open(OLLAMA_PORT).await {
-        eprintln!("[mygpt] ollama already running on :{}", OLLAMA_PORT);
+        eprintln!("[mygpt] ✓ Ollama already running on port {}", OLLAMA_PORT);
         return None;
     }
 
-    let models_dir = get_models_dir();
-    eprintln!("[mygpt] using models directory: {}", models_dir);
+    eprintln!("[mygpt] Using models directory: {}", models_dir);
+    eprintln!("[mygpt] Attempting to start Ollama serve...");
 
     let cmd = app
         .shell()
@@ -98,13 +110,26 @@ pub async fn start_ollama(app: &AppHandle) -> Option<CommandChild> {
 
     match cmd.spawn() {
         Ok((_rx, child)) => {
-            eprintln!("[mygpt] spawned ollama serve");
-            // Give Ollama a moment to bind its port before the backend starts.
+            eprintln!("[mygpt] ✓ Spawned ollama serve process");
+            eprintln!("[mygpt] Waiting up to 15 seconds for Ollama to bind port {}...", OLLAMA_PORT);
+            
+            // Wait for port to become available
             wait_for_port(OLLAMA_PORT, Duration::from_secs(15)).await;
-            Some(child)
+            
+            // Double-check that it's actually responding
+            if is_port_open(OLLAMA_PORT).await {
+                eprintln!("[mygpt] ✓ Ollama port {} is responsive", OLLAMA_PORT);
+                Some(child)
+            } else {
+                eprintln!("[mygpt] ✗ Ollama process started but port {} is not responding", OLLAMA_PORT);
+                eprintln!("[mygpt] Waited 15 seconds but Ollama never bound the port");
+                let _ = child.kill();
+                None
+            }
         }
         Err(e) => {
-            eprintln!("[mygpt] could not spawn ollama (is it installed?): {e}");
+            eprintln!("[mygpt] ✗ Failed to spawn ollama: {}", e);
+            eprintln!("[mygpt] Is ollama.exe in your PATH? You can download it from https://ollama.ai");
             None
         }
     }
@@ -155,11 +180,18 @@ async fn is_port_open(port: u16) -> bool {
 
 async fn wait_for_port(port: u16, timeout: Duration) {
     let start = std::time::Instant::now();
+    let mut attempts = 0;
+    
     while start.elapsed() < timeout {
         if is_port_open(port).await {
+            eprintln!("[mygpt] ✓ Port {} is now open (attempt {})", port, attempts + 1);
             return;
+        }
+        attempts += 1;
+        if attempts % 3 == 0 {
+            eprintln!("[mygpt] Waiting for port {} to open... ({}s elapsed)", port, start.elapsed().as_secs());
         }
         sleep(Duration::from_millis(300)).await;
     }
-    eprintln!("[mygpt] timed out waiting for port {}", port);
+    eprintln!("[mygpt] ✗ Timed out waiting for port {} after {}s", port, timeout.as_secs());
 }
