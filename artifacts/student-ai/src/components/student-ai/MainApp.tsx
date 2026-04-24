@@ -218,9 +218,84 @@ function makeTheme(dark: boolean) {
   } as const;
 }
 
+/* ─────────────── Constants ─────────────── */
+const THEME_STORAGE_KEY = "student-ai-theme";
+const MODEL_PATH_STORAGE_KEY = "student-ai-model-path";
+const SETUP_COMPLETED_KEY = "student-ai-setup-completed";
+
+type ThemeSetting = "dark" | "light" | "auto";
+
+function getSystemTheme(): "dark" | "light" {
+  if (typeof window === "undefined") return "dark";
+  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+}
+
+function resolveTheme(setting: ThemeSetting): "dark" | "light" {
+  if (setting === "auto") return getSystemTheme();
+  return setting;
+}
+
 /* ─────────────── Component ─────────────── */
 export function MainApp() {
-  const [darkMode, setDarkMode] = useState(true);
+  // Theme state with system preference detection
+  const [themeSetting, setThemeSetting] = useState<ThemeSetting>(() => {
+    if (typeof window === "undefined") return "dark";
+    try {
+      const saved = window.localStorage.getItem(THEME_STORAGE_KEY);
+      if (saved === "dark" || saved === "light" || saved === "auto") return saved;
+    } catch {}
+    return "auto";
+  });
+
+  const darkMode = resolveTheme(themeSetting);
+
+  // Persist theme setting
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(THEME_STORAGE_KEY, themeSetting);
+    } catch {}
+  }, [themeSetting]);
+
+  // Listen for system theme changes when theme is set to auto
+  useEffect(() => {
+    if (themeSetting !== "auto") return;
+    
+    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+    const handleChange = () => {
+      // Force re-render by toggling a state that triggers color updates
+      // The component will re-render when system theme changes
+    };
+    
+    try {
+      mediaQuery.addEventListener("change", handleChange);
+      return () => mediaQuery.removeEventListener("change", handleChange);
+    } catch {
+      return undefined;
+    }
+  }, [themeSetting]);
+
+  // Update meta theme-color based on current theme
+  useEffect(() => {
+    try {
+      const metaThemeColor = document.getElementById("theme-color-meta");
+      if (metaThemeColor) {
+        // Set theme color for browser title bar
+        const themeColor = darkMode ? "#1b1815" : "#f5f5f5";
+        metaThemeColor.setAttribute("content", themeColor);
+      }
+      // Also update document's color-scheme
+      document.documentElement.style.colorScheme = darkMode ? "dark" : "light";
+      
+      // Update window/browser title bar theming
+      document.documentElement.setAttribute("data-theme", darkMode ? "dark" : "light");
+      
+      // For Tauri apps, signal theme preference
+      const tauri = (window as any).__TAURI__;
+      if (tauri?.window?.appWindow) {
+        tauri.window.appWindow.setTheme(darkMode ? "dark" : "light").catch(() => {});
+      }
+    } catch {}
+  }, [darkMode]);
   const [input, setInput] = useState("");
   const [activeTab, setActiveTab] = useState<"chat" | "memory" | "docs">("chat");
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(() => {
@@ -245,7 +320,113 @@ export function MainApp() {
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
 
-  /* Calculator */
+  /* Setup Dialog */
+  const [setupOpen, setSetupOpen] = useState(false);
+  const [setupStep, setSetupStep] = useState<"path" | "detecting" | "starting" | "complete">("path");
+  const [modelPathInput, setModelPathInput] = useState(() => {
+    // Check localStorage for previously saved model path
+    if (typeof window === "undefined") return "";
+    try {
+      const saved = window.localStorage.getItem(MODEL_PATH_STORAGE_KEY);
+      return saved || "";
+    } catch {}
+    return "";
+  });
+  const [detectedModels, setDetectedModels] = useState<string[]>([]);
+  const [setupError, setSetupError] = useState<string | null>(null);
+  const [setupLoading, setSetupLoading] = useState(false);
+
+  /* ── Model Selection & Context Preservation ── */
+  type SessionContext = { modelUsed?: string; specialistMode?: boolean; theme?: string };
+  const sessionContextRef = useRef<Map<string, SessionContext>>(new Map());
+  
+  const [availableModels, setAvailableModels] = useState<string[]>([]);
+  const [selectedModel, setSelectedModel] = useState(() => {
+    if (typeof window === "undefined") return "auto";
+    try {
+      return window.localStorage.getItem("student-ai-selected-model") || "auto";
+    } catch {}
+    return "auto";
+  });
+  
+  const [specialistMode, setSpecialistMode] = useState(() => {
+    if (typeof window === "undefined") return false;
+    try {
+      return window.localStorage.getItem("student-ai-specialist-mode") === "1";
+    } catch {}
+    return false;
+  });
+
+  // Initialize available models from localStorage or detected models
+  useEffect(() => {
+    if (detectedModels.length > 0) {
+      setAvailableModels(detectedModels);
+    }
+  }, [detectedModels]);
+
+  // Persist model selection
+  useEffect(() => {
+    try {
+      window.localStorage.setItem("student-ai-selected-model", selectedModel);
+    } catch {}
+  }, [selectedModel]);
+
+  // Persist specialist mode
+  useEffect(() => {
+    try {
+      window.localStorage.setItem("student-ai-specialist-mode", specialistMode ? "1" : "0");
+    } catch {}
+  }, [specialistMode]);
+
+  /* ── Specialist AI Router ── */
+  const detectTaskType = (text: string): string => {
+    const lowerText = text.toLowerCase();
+    const words = lowerText.split(/\s+/);
+    
+    // Detect medical/science tasks
+    if (/(disease|symptom|diagnosis|treatment|medicine|drug|patient|blood|heart|brain|organ)/.test(lowerText)) {
+      return "medical";
+    }
+    
+    // Detect math/calculation tasks
+    if (/(calculate|solve|equation|formula|integral|derivative|matrix|derivative|function|proof)/.test(lowerText)) {
+      return "mathematical";
+    }
+    
+    // Detect legal/law tasks
+    if (/(contract|law|legal|statute|court|plaintiff|defendant|liability|copyright|patent)/.test(lowerText)) {
+      return "legal";
+    }
+    
+    // Detect engineering/technical tasks
+    if (/(circuit|code|algorithm|database|system|network|server|protocol|infrastructure)/.test(lowerText)) {
+      return "engineering";
+    }
+    
+    // Detect humanities/writing tasks
+    if (/(essay|paper|report|literature|history|philosophy|analysis|interpret|discuss)/.test(lowerText)) {
+      return "humanities";
+    }
+    
+    return "general";
+  };
+
+  const getOptimalModel = (taskType: string): string => {
+    if (selectedModel !== "auto") return selectedModel;
+    
+    // Map task types to optimal models
+    const taskModelMap: Record<string, string> = {
+      medical: "medical-llm",
+      mathematical: "mathematical-llm",
+      legal: "legal-llm",
+      engineering: "engineering-llm",
+      humanities: "humanities-llm",
+      general: availableModels[0] || "auto",
+    };
+    
+    return taskModelMap[taskType] || availableModels[0] || "auto";
+  };
+
   const [calcSchool, setCalcSchool] = useState("engineering");
   const [calcDisplay, setCalcDisplay] = useState("0");
   const [calcPos, setCalcPos] = useState({ x: 320, y: 80 });
@@ -385,6 +566,97 @@ export function MainApp() {
     addLog(`Backend error: ${msg}`, "error");
   };
 
+  /* ── Setup Flow (First-time Model & Ollama Configuration) ── */
+  const initializeSetup = async () => {
+    // Check if we have a saved model path in localStorage
+    const savedPath = modelPathInput.trim();
+    if (savedPath) {
+      addLog(`Using saved model path: ${savedPath}`, "info");
+      return;
+    }
+
+    // Otherwise, check backend setup status
+    try {
+      const status = await api.getSetupStatus();
+      if (!status.is_setup_complete) {
+        setSetupOpen(true);
+        setSetupStep("path");
+        addLog("Setup required: Model path not configured", "info");
+      }
+    } catch (err) {
+      addLog("Could not check setup status", "warn");
+    }
+  };
+
+  const handleSetupModelPath = async () => {
+    if (!modelPathInput.trim()) {
+      setSetupError("Please enter a model path");
+      return;
+    }
+
+    setSetupLoading(true);
+    setSetupError(null);
+    setSetupStep("detecting");
+    addLog(`Detecting models in: ${modelPathInput}`, "info");
+
+    try {
+      // First, save the model path to localStorage
+      try {
+        window.localStorage.setItem(MODEL_PATH_STORAGE_KEY, modelPathInput.trim());
+      } catch {}
+
+      // Then, save it on the backend
+      await api.setModelPath(modelPathInput.trim());
+      addLog("Model path saved", "info");
+
+      // Then detect models
+      const detection = await api.detectModels(modelPathInput.trim());
+      if (detection.status === "success") {
+        setDetectedModels(detection.model_files || []);
+        setAvailableModels(detection.model_files || []);
+        addLog(`Found ${detection.models_found || 0} model(s)`, "info");
+        
+        if (detection.ollama_found) {
+          addLog(`Ollama found at: ${detection.ollama_path}`, "info");
+          setSetupStep("starting");
+          
+          // Start Ollama
+          const result = await api.startOllama(modelPathInput.trim());
+          if (result.status === "success") {
+            addLog("✓ Ollama started successfully", "info");
+            setSetupStep("complete");
+            // Mark setup as completed
+            try {
+              window.localStorage.setItem(SETUP_COMPLETED_KEY, "1");
+            } catch {}
+            setTimeout(() => {
+              setSetupOpen(false);
+              // Reload app data
+              refreshSessions();
+              refreshMemory();
+              refreshDocuments();
+            }, 1500);
+          } else {
+            setSetupError(result.message || "Failed to start Ollama");
+            setSetupStep("detecting");
+          }
+        } else {
+          setSetupError("Ollama executable not found in the model directory. Make sure ollama.exe is present.");
+          setSetupStep("path");
+        }
+      } else {
+        setSetupError(detection.message || "Failed to detect models");
+        setSetupStep("path");
+      }
+    } catch (err) {
+      setSetupError(err instanceof Error ? err.message : "Setup failed");
+      setSetupStep("path");
+      addLog(`Setup error: ${err}`, "error");
+    } finally {
+      setSetupLoading(false);
+    }
+  };
+
   // Update header time every minute (GMT +2)
   useEffect(() => {
     setHeaderTime(getGMT2DateTime());
@@ -392,6 +664,11 @@ export function MainApp() {
       setHeaderTime(getGMT2DateTime());
     }, 60000); // Update every 60 seconds
     return () => clearInterval(interval);
+  }, []);
+
+  // Check setup on mount (first-time model path configuration)
+  useEffect(() => {
+    initializeSetup();
   }, []);
 
   /* ── Load sessions / memory / documents on mount ── */
@@ -490,6 +767,18 @@ export function MainApp() {
     setActiveTool(null);
     setSearchResults(null);
     setCurrentDoc(null);
+    
+    // Restore context for this session
+    const context = sessionContextRef.current.get(s.id);
+    if (context) {
+      if (context.modelUsed) {
+        addLog(`Restoring model context for session: ${context.modelUsed}`, "info");
+      }
+      if (context.theme) {
+        addLog(`Session was using ${context.theme} theme`, "info");
+      }
+    }
+    
     try {
       const msgs = await api.getMessages(s.id);
       if (msgs.length === 0) {
@@ -516,6 +805,28 @@ export function MainApp() {
       return;
     }
 
+    // Determine optimal model using specialist router
+    let modelToUse = selectedModel;
+    let taskType = "general";
+    
+    if (specialistMode && selectedModel === "auto") {
+      taskType = detectTaskType(trimmed);
+      modelToUse = getOptimalModel(taskType);
+      addLog(`Specialist Router detected: ${taskType} → using model: ${modelToUse}`, "info");
+    } else if (specialistMode) {
+      taskType = detectTaskType(trimmed);
+      addLog(`Specialist mode active, task type: ${taskType}`, "info");
+    }
+    
+    // Store context for this session
+    if (currentSessionId) {
+      const context = sessionContextRef.current.get(currentSessionId) || {};
+      context.modelUsed = modelToUse;
+      context.specialistMode = specialistMode;
+      context.theme = darkMode ? "dark" : "light";
+      sessionContextRef.current.set(currentSessionId, context);
+    }
+
     const userMsg: Message = {
       id: Date.now(), role: "user", content: trimmed, timestamp: nowStamp(),
     };
@@ -537,7 +848,7 @@ export function MainApp() {
     try {
       const data = await api.chat(trimmed, currentSessionId, imageIds);
       setBackendOnline(true);
-      addLog(`✓ Received response (${data.reply.length} chars)`, "info");
+      addLog(`✓ Received response (${data.reply.length} chars) using model: ${data.model_used || modelToUse}`, "info");
       consecutiveFailuresRef.current = 0;
       setMessages(prev => [
         ...prev,
@@ -946,7 +1257,7 @@ export function MainApp() {
   const dragRef  = useRef<{ ox: number; oy: number; px: number; py: number } | null>(null);
   const resizeRef = useRef<{ ox: number; oy: number; w: number; h: number } | null>(null);
 
-  const c = makeTheme(darkMode);
+  const c = makeTheme(darkMode === "dark");
 
   function startDrag(e: React.MouseEvent) {
     e.preventDefault();
@@ -1241,14 +1552,53 @@ export function MainApp() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {/* Theme toggle */}
+            {/* Model selector */}
+            {availableModels.length > 0 && (
+              <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-indigo-500/10 border border-indigo-500/20">
+                <select
+                  value={selectedModel}
+                  onChange={(e) => setSelectedModel(e.target.value)}
+                  className={`bg-transparent text-xs font-medium ${c.text} outline-none cursor-pointer`}
+                  title="Select AI model or enable specialist router"
+                  aria-label="Select AI model"
+                >
+                  <option value="auto">Auto</option>
+                  {availableModels.map(model => (
+                    <option key={model} value={model}>{model.replace(/[-_]/g, " ")}</option>
+                  ))}
+                </select>
+                <button
+                  onClick={() => setSpecialistMode(!specialistMode)}
+                  className={`px-2 py-0.5 rounded text-xs font-medium transition-colors ${
+                    specialistMode
+                      ? "bg-indigo-600 text-white"
+                      : "bg-indigo-500/20 text-indigo-600"
+                  }`}
+                  title={specialistMode ? "Specialist Router: ON" : "Specialist Router: OFF"}
+                  aria-label="Toggle specialist router"
+                >
+                  {specialistMode ? "🎯 Specialist" : "Specialist"}
+                </button>
+              </div>
+            )}
+            {/* Theme toggle - cycle through dark, light, auto */}
             <button
-              onClick={() => setDarkMode(d => !d)}
+              onClick={() => {
+                const next: ThemeSetting[] = ["dark", "light", "auto"];
+                const current = next.indexOf(themeSetting);
+                setThemeSetting(next[(current + 1) % next.length]);
+              }}
               className={`w-8 h-8 flex items-center justify-center rounded-lg ${c.bgMuted} border ${c.border} ${c.textMuted} ${c.hoverMuted} transition-colors`}
-              title={darkMode ? "Switch to light theme" : "Switch to dark theme"}
-              aria-label={darkMode ? "Switch to light theme" : "Switch to dark theme"}
+              title={`Theme: ${themeSetting} (click to cycle)`}
+              aria-label={`Theme mode: ${themeSetting}`}
             >
-              {darkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+              {themeSetting === "auto" ? (
+                <span className="text-sm font-bold">◐</span>
+              ) : darkMode ? (
+                <Sun className="w-4 h-4" />
+              ) : (
+                <Moon className="w-4 h-4" />
+              )}
             </button>
             {/* Keyboard shortcuts */}
             <button
@@ -2039,17 +2389,24 @@ export function MainApp() {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className={`text-xs font-medium ${c.text}`}>Theme</p>
-                      <p className={`text-[11px] mt-0.5 ${c.textFaint}`}>Switch between light and dark.</p>
+                      <p className={`text-[11px] mt-0.5 ${c.textFaint}`}>Choose your preferred color scheme.</p>
                     </div>
                     <div className={`flex items-center rounded-lg border ${c.border} ${c.bgMuted} p-0.5`}>
                       <button
-                        onClick={() => setDarkMode(false)}
-                        className={`px-3 py-1.5 rounded-md text-[11px] font-medium flex items-center gap-1.5 ${!darkMode ? "bg-indigo-600 text-white" : `${c.textMuted} ${c.hoverMuted}`}`}
+                        onClick={() => setThemeSetting("light")}
+                        className={`px-2.5 py-1.5 rounded-md text-[10px] font-medium flex items-center gap-1 whitespace-nowrap ${themeSetting === "light" ? "bg-indigo-600 text-white" : `${c.textMuted} ${c.hoverMuted}`}`}
+                        title="Light theme"
                       ><Sun className="w-3 h-3" />Light</button>
                       <button
-                        onClick={() => setDarkMode(true)}
-                        className={`px-3 py-1.5 rounded-md text-[11px] font-medium flex items-center gap-1.5 ${darkMode ? "bg-indigo-600 text-white" : `${c.textMuted} ${c.hoverMuted}`}`}
+                        onClick={() => setThemeSetting("dark")}
+                        className={`px-2.5 py-1.5 rounded-md text-[10px] font-medium flex items-center gap-1 whitespace-nowrap ${themeSetting === "dark" ? "bg-indigo-600 text-white" : `${c.textMuted} ${c.hoverMuted}`}`}
+                        title="Dark theme"
                       ><Moon className="w-3 h-3" />Dark</button>
+                      <button
+                        onClick={() => setThemeSetting("auto")}
+                        className={`px-2.5 py-1.5 rounded-md text-[10px] font-medium flex items-center gap-1 whitespace-nowrap ${themeSetting === "auto" ? "bg-indigo-600 text-white" : `${c.textMuted} ${c.hoverMuted}`}`}
+                        title="Follow system preference"
+                      ><Circle className="w-2.5 h-2.5" />Auto</button>
                     </div>
                   </div>
 
@@ -2832,6 +3189,126 @@ export function MainApp() {
               >
                 Save profile
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ══ SETUP DIALOG (First-Time Model Path & Ollama Configuration) ══ */}
+      {setupOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Setup"
+        >
+          <div
+            className={`w-full max-w-md rounded-2xl border ${c.borderMd} ${c.card} shadow-2xl overflow-hidden`}
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="px-6 pt-7 pb-5 text-center">
+              <div className="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center shadow-lg shadow-indigo-500/30 mb-4 overflow-hidden">
+                <FlaskConical className="w-8 h-8 text-white" />
+              </div>
+              <h2 className={`text-lg font-semibold ${c.text}`}>Model Setup 🔧</h2>
+              <p className={`text-sm mt-2 ${c.textBody}`}>
+                Let's find your Ollama models and get everything ready.
+              </p>
+            </div>
+
+            <div className={`px-6 py-5 space-y-4 border-t border-b ${c.border}`}>
+              {setupStep === "path" && (
+                <>
+                  <div>
+                    <label className={`block text-xs font-semibold ${c.textMd} mb-2`}>
+                      Where are your Ollama models stored?
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g., C:\models or /home/user/models"
+                      value={modelPathInput}
+                      onChange={e => setModelPathInput(e.target.value)}
+                      onKeyDown={e => {
+                        if (e.key === "Enter" && !setupLoading) {
+                          handleSetupModelPath();
+                        }
+                      }}
+                      disabled={setupLoading}
+                      className={`w-full px-3 py-2 rounded-lg border ${c.border} ${c.inputWrap} text-sm text-white outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50`}
+                      aria-label="Model path input"
+                    />
+                    {setupError && (
+                      <p className={`text-xs ${c.textBody} mt-1.5 text-rose-400`}>
+                        {setupError}
+                      </p>
+                    )}
+                    <p className={`text-xs ${c.textFaint} mt-1.5`}>
+                      This folder should contain ollama.exe and your model files (.gguf, .bin, etc.)
+                    </p>
+                  </div>
+                </>
+              )}
+
+              {setupStep === "detecting" && (
+                <div className="text-center space-y-3">
+                  <div className="flex justify-center">
+                    <Loader2 className="w-5 h-5 text-indigo-500 animate-spin" />
+                  </div>
+                  <p className={`text-sm ${c.textBody}`}>Scanning for models...</p>
+                  {detectedModels.length > 0 && (
+                    <div className={`text-left p-3 rounded-lg ${c.bgSub} border ${c.border}`}>
+                      <p className={`text-xs font-semibold ${c.textMd} mb-2`}>Found models:</p>
+                      <div className={`space-y-1 max-h-24 overflow-y-auto`}>
+                        {detectedModels.map((model, i) => (
+                          <p key={i} className={`text-[11px] ${c.textBody} truncate`}>
+                            • {model}
+                          </p>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {setupStep === "starting" && (
+                <div className="text-center space-y-3">
+                  <div className="flex justify-center">
+                    <Loader2 className="w-5 h-5 text-indigo-500 animate-spin" />
+                  </div>
+                  <p className={`text-sm ${c.textBody}`}>Starting Ollama...</p>
+                </div>
+              )}
+
+              {setupStep === "complete" && (
+                <div className="text-center space-y-3">
+                  <div className="flex justify-center">
+                    <CheckCircle2 className="w-8 h-8 text-emerald-500" />
+                  </div>
+                  <p className={`text-sm font-semibold ${c.text}`}>✓ Setup Complete!</p>
+                  <p className={`text-xs ${c.textBody}`}>Your models are ready. Redirecting...</p>
+                </div>
+              )}
+            </div>
+
+            <div className="px-6 py-4 flex justify-between gap-3">
+              {setupStep === "path" && (
+                <>
+                  <button
+                    onClick={() => setSetupOpen(false)}
+                    disabled={setupLoading}
+                    className={`px-3 py-1.5 rounded-lg text-xs ${c.textMuted} ${c.hoverMuted} transition-colors disabled:opacity-50`}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleSetupModelPath}
+                    disabled={setupLoading || !modelPathInput.trim()}
+                    className="px-4 py-1.5 rounded-lg text-xs font-medium bg-indigo-600 hover:bg-indigo-500 text-white transition-colors disabled:opacity-50"
+                  >
+                    {setupLoading ? "Scanning..." : "Next"}
+                  </button>
+                </>
+              )}
             </div>
           </div>
         </div>

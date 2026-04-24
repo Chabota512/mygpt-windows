@@ -40,6 +40,29 @@ export type ApiChatResponse = {
   model_used?: string | null;
 };
 
+export type ApiSetupStatus = {
+  is_setup_complete: boolean;
+  model_path: string | null;
+  ollama_running: boolean;
+};
+
+export type ApiDetectModelsResult = {
+  status: "success" | "error";
+  model_path?: string;
+  models_found?: number;
+  model_files?: string[];
+  ollama_found?: boolean;
+  ollama_path?: string | null;
+  message?: string;
+};
+
+export type ApiOllamaStartResult = {
+  status: "success" | "error";
+  message: string;
+  ollama_path?: string;
+  model_path?: string;
+};
+
 async function j<T>(r: Response): Promise<T> {
   if (!r.ok) {
     const text = await r.text().catch(() => "");
@@ -161,6 +184,25 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(p),
     }).then(j<ApiProfile>),
+
+  // ── Setup (First-Time Model & Ollama Configuration) ────────
+  getSetupStatus: () => fetch(`${API_BASE}/setup/status`).then(j<ApiSetupStatus>),
+  setModelPath: (path: string) =>
+    fetch(`${API_BASE}/setup/model-path`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ path }),
+    }).then(j<{ status: string; model_path: string }>),
+  detectModels: (path?: string) => {
+    const query = path ? `?path=${encodeURIComponent(path)}` : "";
+    return fetch(`${API_BASE}/setup/detect-models${query}`).then(j<ApiDetectModelsResult>);
+  },
+  startOllama: (path?: string) =>
+    fetch(`${API_BASE}/setup/start-ollama`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: path ? JSON.stringify({ path }) : undefined,
+    }).then(j<ApiOllamaStartResult>),
 };
 
 export type ApiProfile = { name: string; career: string; avatar: string | null };

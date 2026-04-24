@@ -45,6 +45,10 @@ from ollama_manager import (
     is_server_running,
 )
 
+# Import Setup Manager for model path and Ollama initialization
+from setup_manager import SetupManager
+from routes.setup import setup_router, inject_setup_manager
+
 
 # ──────────────────────────────────────────────────────────────────────
 # Paths & DB
@@ -210,6 +214,13 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ──────────────────────────────────────────────────────────────────────
+# Setup Manager for Model Path & Ollama Initialization
+# ──────────────────────────────────────────────────────────────────────
+setup_manager = SetupManager(MODEL_LOCATION_FILE)
+inject_setup_manager(setup_manager)
+app.include_router(setup_router, prefix="/setup", tags=["setup"])
 
 
 # ──────────────────────────────────────────────────────────────────────
