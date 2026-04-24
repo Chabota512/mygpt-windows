@@ -388,12 +388,11 @@ export function MainApp() {
   // Update header time every minute (GMT +2)
   useEffect(() => {
     setHeaderTime(getGMT2DateTime());
-    addLog("App initialized - My_GPT 4 Students", "info");
     const interval = setInterval(() => {
       setHeaderTime(getGMT2DateTime());
     }, 60000); // Update every 60 seconds
     return () => clearInterval(interval);
-  }, [addLog]);
+  }, []);
 
   /* ── Load sessions / memory / documents on mount ── */
   const refreshSessions = useCallback(async () => {
@@ -422,7 +421,7 @@ export function MainApp() {
   }, []);
 
   useEffect(() => {
-    let retryTimeout: NodeJS.Timeout | null = null;
+    let retryTimeout: number | null = null;
     let attempt = 0;
     const maxAttempts = 20; // ~30 seconds with exponential backoff
     
