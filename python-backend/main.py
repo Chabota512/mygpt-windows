@@ -25,6 +25,7 @@ import sys
 import re
 import sqlite3
 import uuid
+import asyncio
 from datetime import datetime
 from io import BytesIO
 from pathlib import Path
@@ -48,6 +49,10 @@ from ollama_manager import (
 # Import Setup Manager for model path and Ollama initialization
 from setup_manager import SetupManager
 from routes.setup import setup_router, inject_setup_manager
+
+# Import Ollama Configuration Manager
+from ollama_config_manager import get_manager as get_ollama_config_manager
+from routes.ollama_config import router as ollama_config_router
 
 
 # ──────────────────────────────────────────────────────────────────────
@@ -222,6 +227,11 @@ setup_manager = SetupManager(MODEL_LOCATION_FILE)
 inject_setup_manager(setup_manager)
 app.include_router(setup_router, prefix="/setup", tags=["setup"])
 
+# Ollama Configuration Manager & Routes
+# ──────────────────────────────────────────────────────────────────────
+# This provides endpoints to get/set Ollama config and check status
+app.include_router(ollama_config_router, tags=["ollama"])
+
 
 # ──────────────────────────────────────────────────────────────────────
 # Specialist Router Initialization & Startup Automation
@@ -238,39 +248,55 @@ specialist_router = SpecialistRouter(
 async def startup_ollama():
     """
     On app startup:
-    1. Configure the Ollama environment (model directory, host)
-    2. Start the Ollama server if not running
+    1. Load and configure Ollama from ollama_config.json
+    2. Start the Ollama server if not running (using PowerShell script)
     3. Pre-load the Writer model (lightest) so the first chat is instant
     """
     print("\n" + "=" * 70)
     print("[startup] My_GPT 4 Students — Initializing Ollama Automation")
     print("=" * 70)
     
-    # Configure Ollama environment variables
-    set_model_dir(MODEL_DIR)
-    set_ollama_host(OLLAMA_HOST)
+    # Get the Ollama config manager
+    ollama_config_mgr = get_ollama_config_manager()
+    config = ollama_config_mgr.get_config()
     
-    # Hard constraint: one model at a time on 8GB system
-    os.environ["OLLAMA_MAX_LOADED_MODELS"] = "1"
-    print(f"[startup] RAM Guard: OLLAMA_MAX_LOADED_MODELS=1")
+    print(f"[startup] Ollama Configuration:")
+    print(f"  - Enabled: {config.get('ollama_enabled', True)}")
+    print(f"  - Model Path: {config.get('model_path') or '(auto-detect)'}")
+    print(f"  - Host: {config.get('ollama_host', 'http://127.0.0.1:11434')}")
     
-    # Start Ollama server and wait for it to be responsive
-    print(f"[startup] Ensuring Ollama server is running on {OLLAMA_HOST}…")
-    if ensure_server_running(MODEL_DIR):
-        print("[startup] ✓ Ollama server is running")
-        
-        # Pre-load the Writer model (lightest, fastest to respond)
-        print("[startup] Pre-loading Writer model…")
-        if specialist_router.ensure_writer_loaded():
-            print("[startup] ✓ Writer model ready (chat will be instant)")
-        else:
-            print("[startup] ✗ Failed to pre-load Writer model (will retry on first chat)")
-    else:
-        print(
-            "[startup] ✗ Ollama server failed to start.\n"
-            "           Make sure ollama.exe is at: {MODEL_DIR}/ollama.exe\n"
-            "           Or download from https://ollama.com"
-        )
+    # Start Ollama using the config manager (PowerShell script)
+    print(f"[startup] Starting Ollama server…")
+    ollama_config_mgr.start_ollama_async()
+    
+    # Wait a bit for Ollama to start
+    print(f"[startup] Waiting for Ollama to become responsive…")
+    max_wait = 30
+    for i in range(max_wait):
+        try:
+            response = ensure_server_running(MODEL_DIR)
+            if response:
+                print("[startup] ✓ Ollama server is running")
+                
+                # Pre-load the Writer model (lightest, fastest to respond)
+                print("[startup] Pre-loading Writer model…")
+                if specialist_router.ensure_writer_loaded():
+                    print("[startup] ✓ Writer model ready (chat will be instant)")
+                else:
+                    print("[startup] ✗ Failed to pre-load Writer model (will retry on first chat)")
+                break
+        except Exception as e:
+            if i < max_wait - 1:
+                print(f"[startup] Waiting… (attempt {i+1}/{max_wait})")
+                await asyncio.sleep(1)
+            else:
+                print(
+                    f"[startup] ✗ Ollama server did not start after {max_wait} seconds.\n"
+                    f"           Check the logs above, and verify:\n"
+                    f"           1. Model path is correct: {config.get('model_path') or '(auto-detect)'}\n"
+                    f"           2. ollama.exe exists at that path\n"
+                    f"           3. No other app is using port {config.get('ollama_port', 11434)}"
+                )
     
     print("=" * 70 + "\n")
 

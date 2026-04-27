@@ -63,6 +63,27 @@ export type ApiOllamaStartResult = {
   model_path?: string;
 };
 
+export type ApiOllamaConfig = {
+  ollama_enabled: boolean;
+  model_path: string;
+  ollama_executable: string;
+  ollama_host: string;
+  ollama_port: number;
+  max_retries: number;
+  retry_delay_seconds: number;
+  auto_restart_on_failure: boolean;
+  keep_alive?: string;
+};
+
+export type ApiOllamaStatus = {
+  enabled: boolean;
+  is_running: boolean;
+  host: string;
+  port: number;
+  config_file: string;
+  startup_script: string;
+};
+
 async function j<T>(r: Response): Promise<T> {
   if (!r.ok) {
     const text = await r.text().catch(() => "");
@@ -203,6 +224,18 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: path ? JSON.stringify({ path }) : undefined,
     }).then(j<ApiOllamaStartResult>),
+
+  // ── Ollama Configuration ───────────────────────────────────
+  getOllamaConfig: () => fetch(`${API_BASE}/ollama/config`).then(j<ApiOllamaConfig>),
+  updateOllamaConfig: (updates: Partial<ApiOllamaConfig>) =>
+    fetch(`${API_BASE}/ollama/config/update`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(updates),
+    }).then(j<{ status: string; config: ApiOllamaConfig; message?: string }>),
+  restartOllama: () =>
+    fetch(`${API_BASE}/ollama/restart`, { method: "POST" }).then(j<{ status: string; message: string }>),
+  getOllamaStatus: () => fetch(`${API_BASE}/ollama/status`).then(j<ApiOllamaStatus>),
 };
 
 export type ApiProfile = { name: string; career: string; avatar: string | null };

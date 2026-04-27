@@ -1,1 +1,1 @@
-{"ollama_host": "http://localhost:11434", "vision_model": "phi4-mini:latest", "reasoning_model": "llama3.2:1b", "writer_model": "llama3.2:1b"}
+{"ollama_host": "http://localhost:11434", "vision_model": "qwen3.5:0.8b", "reasoning_model": "phi4-mini:latest", "writer_model": "llama3.2:1b"}
