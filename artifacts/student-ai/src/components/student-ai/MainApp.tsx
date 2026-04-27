@@ -11,6 +11,7 @@ import {
   type ApiLLMConfig,
   type ApiLLMStatus,
 } from "./api";
+import { OllamaSettings } from "./OllamaSettings";
 import {
   Send, FileText, Image, BookOpen, Settings,
   ChevronRight, Paperclip, MoreHorizontal, WifiOff, Download,
@@ -2491,6 +2492,9 @@ export function MainApp() {
                   </div>
                 )}
               </section>
+
+              {/* Ollama Configuration */}
+              <OllamaSettings c={c} />
 
               {/* Custom model path */}
               <section>
