@@ -65,8 +65,7 @@ export type ApiOllamaStartResult = {
 
 export type ApiOllamaConfig = {
   ollama_enabled: boolean;
-  model_path: string;
-  ollama_executable: string;
+  ollama_path: string;
   ollama_host: string;
   ollama_port: number;
   max_retries: number;

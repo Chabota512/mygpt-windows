@@ -4,8 +4,7 @@ import { api } from './api';
 
 interface OllamaConfig {
   ollama_enabled: boolean;
-  model_path: string;
-  ollama_executable: string;
+  ollama_path: string;
   ollama_host: string;
   ollama_port: number;
   max_retries: number;
@@ -215,30 +214,17 @@ export function OllamaSettings({ c }: Props) {
           </label>
         </div>
 
-        {/* Model Path */}
+        {/* Ollama Path - Single Field */}
         <div>
-          <label className={`text-xs font-medium ${c.text} block mb-1.5`}>Model Path</label>
+          <label className={`text-xs font-medium ${c.text} block mb-1.5`}>Ollama Folder Path</label>
           <input
             type="text"
-            value={config?.model_path ?? ''}
-            onChange={(e) => setConfig(prev => prev ? { ...prev, model_path: e.target.value } : null)}
-            placeholder="e.g., E:\MyModels or leave empty for auto-detect"
+            value={config?.ollama_path ?? ''}
+            onChange={(e) => setConfig(prev => prev ? { ...prev, ollama_path: e.target.value } : null)}
+            placeholder="e.g., C:\dev\models or leave empty for auto-detect"
             className={`w-full px-3 py-2 rounded-lg border ${c.border} ${c.card} text-xs font-mono ${c.text} placeholder:${c.textFaint} focus:outline-none focus:ring-1 focus:ring-indigo-500`}
           />
-          <p className={`text-[10px] mt-1 ${c.textFaint}`}>Directory containing your models. Leave empty to auto-detect.</p>
-        </div>
-
-        {/* Ollama Executable */}
-        <div>
-          <label className={`text-xs font-medium ${c.text} block mb-1.5`}>Ollama Executable Path</label>
-          <input
-            type="text"
-            value={config?.ollama_executable ?? ''}
-            onChange={(e) => setConfig(prev => prev ? { ...prev, ollama_executable: e.target.value } : null)}
-            placeholder="e.g., E:\MyModels\ollama.exe or leave empty for auto-detect"
-            className={`w-full px-3 py-2 rounded-lg border ${c.border} ${c.card} text-xs font-mono ${c.text} placeholder:${c.textFaint} focus:outline-none focus:ring-1 focus:ring-indigo-500`}
-          />
-          <p className={`text-[10px] mt-1 ${c.textFaint}`}>Path to ollama.exe. Leave empty to auto-detect from system PATH.</p>
+          <p className={`text-[10px] mt-1 ${c.textFaint}`}>Folder where both your models and ollama.exe are located. Leave empty to auto-detect.</p>
         </div>
 
         {/* Ollama Host */}
@@ -255,7 +241,7 @@ export function OllamaSettings({ c }: Props) {
         </div>
 
         {/* Ollama Port */}
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 gap-3">
           <div>
             <label className={`text-xs font-medium ${c.text} block mb-1.5`}>Port</label>
             <input
@@ -280,19 +266,19 @@ export function OllamaSettings({ c }: Props) {
               className={`w-full px-3 py-2 rounded-lg border ${c.border} ${c.card} text-xs ${c.text} focus:outline-none focus:ring-1 focus:ring-indigo-500`}
             />
           </div>
+        </div>
 
-          {/* Retry Delay */}
-          <div>
-            <label className={`text-xs font-medium ${c.text} block mb-1.5`}>Retry Delay (s)</label>
-            <input
-              type="number"
-              value={config?.retry_delay_seconds ?? 2}
-              onChange={(e) => setConfig(prev => prev ? { ...prev, retry_delay_seconds: parseInt(e.target.value) } : null)}
-              min="1"
-              max="60"
-              className={`w-full px-3 py-2 rounded-lg border ${c.border} ${c.card} text-xs ${c.text} focus:outline-none focus:ring-1 focus:ring-indigo-500`}
-            />
-          </div>
+        {/* Retry Delay */}
+        <div>
+          <label className={`text-xs font-medium ${c.text} block mb-1.5`}>Retry Delay (seconds)</label>
+          <input
+            type="number"
+            value={config?.retry_delay_seconds ?? 2}
+            onChange={(e) => setConfig(prev => prev ? { ...prev, retry_delay_seconds: parseInt(e.target.value) } : null)}
+            min="1"
+            max="60"
+            className={`w-full px-3 py-2 rounded-lg border ${c.border} ${c.card} text-xs ${c.text} focus:outline-none focus:ring-1 focus:ring-indigo-500`}
+          />
         </div>
 
         {/* Auto-restart on failure */}

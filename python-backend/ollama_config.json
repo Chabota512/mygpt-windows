@@ -1,12 +1,11 @@
 {
   "ollama_enabled": true,
-  "model_path": "",
-  "ollama_executable": "",
+  "ollama_path": "",
   "ollama_host": "http://127.0.0.1:11434",
   "ollama_port": 11434,
   "max_retries": 10,
   "retry_delay_seconds": 2,
   "auto_restart_on_failure": true,
   "keep_alive": "5m",
-  "notes": "This file can be edited manually. Empty paths will auto-detect. Update model_path to your models folder location."
+  "notes": "This file can be edited manually. Leave ollama_path empty to auto-detect. Set ollama_path to your folder (e.g., C:\\dev\\models) where both models and ollama.exe are located."
 }

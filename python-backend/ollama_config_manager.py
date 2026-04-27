@@ -38,8 +38,7 @@ class OllamaConfigManager:
         # Return default config
         return {
             "ollama_enabled": True,
-            "model_path": "",
-            "ollama_executable": "",
+            "ollama_path": "",
             "ollama_host": "http://127.0.0.1:11434",
             "ollama_port": 11434,
             "max_retries": 10,
